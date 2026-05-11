@@ -64,8 +64,8 @@ tamagotchi_rpg/
 | **View** | `Renderer` — ANSI 이스케이프 코드로 터미널 출력 |
 | **Controller** | `GameEngine` + `*Screen` — 게임 흐름 및 입력 처리 |
 
-`GameEngine`은 단일 `Character player`와 현재 화면(`currentScreen`)을 소유하며, 매 루프마다 `handleInput()` → `render()` 순으로 실행합니다.  
-화면 전환은 `engine.changeScreen(std::make_unique<XScreen>())` 호출로 이루어집니다.
+`GameEngine`은 단일 `Character player`와 현재 화면(`currentScreen`)을 소유하며, 매 루프마다 `handleInput()` → `render()` 순으로 실행
+화면 전환은 `engine.changeScreen(std::make_unique<XScreen>())` 호출
 
 ---
 
@@ -98,16 +98,16 @@ tamagotchi_rpg/
 | `level` / `exp` | — | 레벨 및 경험치 |
 | `money` | — | 보유 금액 |
 
-`Character::isEndingCondition()` 이 `true`를 반환하면 게임이 즉시 종료됩니다.
+`Character::isEndingCondition()` 이 `true`를 반환하면 게임이 즉시 종료
 
 ---
 
 ## 전투 시스템
 
-- 스테이지 1–5 중 선택하면 해당 스테이지 몬스터가 생성됩니다.
-- 전투는 **가위바위보** 방식으로 진행됩니다.
-- 각 몬스터는 `dots/monster*.txt`의 ASCII 아트를 가집니다.
-- 몬스터는 HP, 공격력, 회피율(`evasion`) 스탯을 보유합니다.
+- 스테이지 1–5 중 선택하면 해당 스테이지 몬스터가 생성
+- 전투는 **가위바위보** 방식으로 진행
+- 각 몬스터는 `dots/monster*.txt`의 ASCII 아트
+- 몬스터는 HP, 공격력, 회피율(`evasion`) 스탯을 보유
 
 ---
 
@@ -127,4 +127,4 @@ tamagotchi_rpg/
 
 ## 게임 오버 조건
 
-`Character::isEndingCondition()` 내부 조건을 충족하면 (예: 특정 스탯이 한계치에 도달) 즉시 게임 종료 메시지가 출력됩니다.
+`Character::isEndingCondition()` 내부 조건을 충족하면 (예: 특정 스탯이 한계치에 도달) 즉시 게임 종료 메시지가 출력
