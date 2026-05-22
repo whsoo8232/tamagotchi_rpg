@@ -26,7 +26,7 @@ static const char* ANIM_FRAMES[4][3] = {
 
 void RaisingScreen::render(const Character& player) {
     Renderer::clearCanvas();
-    Renderer::drawTopMenu(player, "2026-05-04");
+    Renderer::drawTopMenu(player);
 
     std::cout << std::endl;
     Renderer::drawMainCharacter();
@@ -49,23 +49,21 @@ void RaisingScreen::render(const Character& player) {
         std::cout << "\n\n";
     }
 
-    Renderer::drawBottomMenu({"밥주기 (1)", "목욕하기 (2)", "놀아주기 (3)", "치료하기 (4)", "돌아가기 (0)"});
+    Renderer::drawBottomMenu({"밥주기", "목욕하기", "놀아주기", "치료하기", "돌아가기"});
 }
 
 void RaisingScreen::handleInput(GameEngine& engine, Character& player, const InputEvent& event) {
     int choice = -1;
 
-    if (event.type == InputType::KEYBOARD) {
-        if (event.key >= '0' && event.key <= '4') {
-            choice = event.key - '0';
-        }
-    } else if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
+    if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
         if (event.y >= 30) {
-            if (event.x >= 1 && event.x <= 24) choice = 1;
-            else if (event.x >= 25 && event.x <= 48) choice = 2;
-            else if (event.x >= 49 && event.x <= 72) choice = 3;
-            else if (event.x >= 73 && event.x <= 96) choice = 4;
-            else if (event.x >= 97) choice = 0;
+            int btnW = 118 / 5;
+            int btn  = (event.x - 1) / btnW;
+            if (btn == 0) choice = 1;
+            else if (btn == 1) choice = 2;
+            else if (btn == 2) choice = 3;
+            else if (btn == 3) choice = 4;
+            else               choice = 0;
         }
     }
 

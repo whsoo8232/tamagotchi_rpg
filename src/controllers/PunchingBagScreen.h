@@ -3,10 +3,9 @@
 
 #include "Screen.h"
 #include <chrono>
-#include <vector>
 #include <string>
 
-enum class PBState { INTRO, WAITING, SIGNAL, JUDGMENT, FINAL };
+enum class PBState { IDLE, PUNCHING, DONE };
 
 class PunchingBagScreen : public Screen {
 public:
@@ -15,29 +14,17 @@ public:
     void handleInput(GameEngine& engine, Character& player, const InputEvent& event) override;
 
 private:
-    PBState state;
-    std::chrono::steady_clock::time_point stateEntered;
-    std::chrono::steady_clock::time_point signalStart;
+    PBState   state;
+    int       punchCount;  // 0-30
+    bool      punchAnim;   // 펀치 직후 애니메이션 프레임
+    std::chrono::steady_clock::time_point punchTime;
 
-    int round;        // 1-10
-    int totalRounds;
-    int score;
-    int combo;
-    int signalDir;    // 0=up 1=down 2=left 3=right
-    int signalPos;    // column offset for scrolling (decreases over time)
-    int prevDir;
-    bool inputHandled;
-    long long inputReactionMs;
+    // 샌드백 단계: 0=온전, 1=균열(10+), 2=파손(20+), 3=파괴(30)
+    int bagStage() const;
 
-    std::string lastJudgment;
-    std::vector<std::string> roundResults;
-
-    long long waitDuration; // ms until signal appears
-
-    void nextRound();
-    void generateSignal();
-    void enterState(PBState s);
-    int calcExp() const;
+    static const char* BAG_ART[4][8];   // 4단계 × 8행
+    static const char* CHAR_IDLE[6];
+    static const char* CHAR_PUNCH[6];
 };
 
 #endif

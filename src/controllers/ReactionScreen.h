@@ -3,10 +3,15 @@
 
 #include "Screen.h"
 #include <chrono>
-#include <vector>
 #include <string>
 
-enum class RCState { INTRO, WAITING, SIGNAL, JUDGED, RESULT };
+enum class RCState {
+    INTRO,    // 안내 화면 (잠시 대기 후 WAITING)
+    WAITING,  // "준비" — 랜덤 1-3초 대기
+    SIGNAL,   // "지금!" — 반응 대기
+    JUDGED,   // 결과 표시 (1초 후 종료)
+    RESULT,   // 최종 결과
+};
 
 class ReactionScreen : public Screen {
 public:
@@ -15,29 +20,18 @@ public:
     void handleInput(GameEngine& engine, Character& player, const InputEvent& event) override;
 
 private:
-    RCState state;
+    RCState   state;
     std::chrono::steady_clock::time_point stateEntered;
     std::chrono::steady_clock::time_point signalStart;
 
-    int round;
-    int totalRounds;
-    bool isStar;          // true = ★, false = ✕
-    int consecutiveX;
-    bool inputReceived;
-    std::string lastStatus;
+    long long waitMs;       // WAITING 지속 시간 (랜덤 1000-3000ms)
+    long long reactionMs;   // -1: 미입력, >=0: 반응 시간
+    int       agiGain;      // 획득 민첩
+    std::string judgeMsg;   // 판정 메시지
 
-    int signalAreaX;  // random position within display (col offset 10-80)
-    int signalAreaY;  // relative row offset within signal box (0-4)
-
-    std::vector<long long> reactionTimes; // valid ★ reaction times in ms
-    int xAvoidSuccess;
-
-    long long waitDuration; // ms until signal appears
-
-    void enterState(RCState s);
-    void generateSignal();
-    int calcExp() const;
-    long long averageReaction() const;
+    long long elapsed() const;
+    long long signalElapsed() const;
+    int calcAgiGain(long long ms) const;
 };
 
 #endif

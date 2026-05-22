@@ -14,7 +14,7 @@ public:
     void changeScreen(std::unique_ptr<Screen> nextScreen);
     void quit();
     
-    std::string getDate() const { return "2026-05-04"; }
+    // 날짜는 Renderer::getCurrentDate() 사용
 
 private:
     bool running;

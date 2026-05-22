@@ -3,203 +3,112 @@
 #include "TrainingScreen.h"
 #include "../views/Renderer.h"
 #include <iostream>
-#include <sstream>
+#include <string>
 #include <algorithm>
 
-// Two running pose frames extracted from training1.cpp (braille art, 25 lines each)
-const std::vector<std::vector<std::string>> RunningScreen::FRAMES = {
-    {   // Frame 0
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⢁⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢪⠐⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡠⢊⢀⠑⠢⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡔⡁⣡⣋⣪⠀⡣⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢪⠚⠀⠀⠀⠀⠀⠀⠀⠋⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⡅⢄⣀⠀⠀⠀⠀⠀⠀⣀⣜⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡠⠤⠤⠒⠒⠤⠤⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠈⠉⠉⠉⠀⢸⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⡠⠊⠁⠀⠀⠀⠀⠀⠀⠀⠀⠈⠢⢄⠀⠀⠀⠀⠀⠀⠠⡃⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⣈⢆⠀⠀⠀⠀⠀⠈⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠣⠼⠀⠀⠀⠀⠀⠀⠀⠘⠼⠘⡄⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⢰⠉⠁⠀⠉⠉⠉⡇⠀⠀⢇⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⢸⠉⠀⠒⠒⠂⠈⡃⠀⠀⢸⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠰⢀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⢀⠇⠀⢀⡀⢀⡀⣀⠀⠑⠒⠒⠒⠒⠊⠁⠀⠀⠧⠤⡀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⡸⠀⠀⠀⠀⠁⠀⠀⠱⡀⠀⠀⠀⠀⠀⠀⠀⠘⠀⠀⠸⡀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⢠⠁⠀⠀⠀⠀⠀⠀⠀⠀⠇⠀⡠⠃⠀⠠⡃⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⡇⠀⠀⠒⠀⠀⠒⠊⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠉⠀⠀⠀⢨⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠐⡅⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠎⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⡠⠊⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠤⠤⢤⢤⢤⡤⠤⠄⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠑⠉⠑⠒⠒⠊⠊⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠈⠢⣀⣀⣀⣀⠜⠀⠁⠑⠤⣀⣀⠤⠊⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    },
-    {   // Frame 1
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡰⠉⠱⡀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢇⠐⠀⡇⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⢠⠀⡇⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡱⠀⠤⡃⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠎⠰⡰⡀⠈⢢⡀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣀⣦⡪⠤⢌⣆⢄⡸⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡔⠉⠀⠀⠀⠀⠀⠀⠀⠱⠢⡀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠳⢦⡤⣀⣀⡀⠀⠀⣀⣀⣤⠃⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠤⠔⠒⠒⠒⠒⠒⠒⠢⠤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠀⡇⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡠⠊⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠑⢄⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡔⠁⠀⠀⠀⢀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢆⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠣⠼⠀⠀⠀⠀⠀⠀⠀⠀⠀⢏⠎⡆⠀⠀⠀⠀⠀⠘⢄  ⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⠀⠊⠉⠉⠉⠉⠉⠉⠂⠀⠀⢇⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⢸",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⢠⠓⠂⠤⠤⠤⠤⠔⠂⠀⠀⢨⡢⠤⠒⠉⠑⢢⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠇⠀⠀⠀⠀⠀⠀⠀⠈⠓⠤⠄⣀⣀⡀⠄⠂⠀⠀⡜⠀⠀⠀⠀⠀⠀⡏⠉⠁⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠈⠉⠀⠉⠉⠑⡄⠀⠀⠀⠀⠀⠀⠀⠀⠐⠁⠀⠀⠀⠀⢀⣠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡐⠀⠀⠀⠀⠀⠀⠀⠀⢸⠤⠔⠒⠊⠉⠁⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀",
-        "⠀⠀⢀⣀⠔⠒⢢⠀⢸⠀⠀⠀⠀⣀⣀⣀⣀⡀⠔⠁⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀",
-        "⠀⠀⢇⡠⢤⠶⠮⡀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⢰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀",
-        "⠀⠀⠀⡎⠁⢠⠒⠁⣀⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠇⠀⠀⠀⠀⠀⠘⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀",
-        "⠀⠀⠀⠑⠊⠁⢠⠊⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠓⡄⠀⠀⠀⠀⠀⠀⠈⠒⠤⣀⣀⠀⠀⢀⣀⠤⠒⠁⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⢀⠔⠒⠤⠤⠤⠤⠤⢤⠄⠒⠈⠀⠀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀",
-        "⠀⠀⠀⠀⠀⠀⠈⠢⣀⣀⣀⡠⠊⠁⠀⠀⠀⠀⠀⠀⠀⠀⠣⢄⣀⣀⣀⠤⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    }
-};
+static constexpr int TOTAL_STEPS = 30;
+static constexpr int TRACK_WIDTH = 100; // 트랙 표시 너비 (컬럼)
 
 RunningScreen::RunningScreen()
-    : state(RNState::INTRO), keyCount(0), countdown(3),
-      animFrame(0), lastKey(0), totalTimeMs(12000) {
-    stateEntered = std::chrono::steady_clock::now();
+    : state(RNState::IDLE), runCount(0), stepAnim(false) {}
+
+int RunningScreen::charPos() const {
+    // 0-based 컬럼, 0~TRACK_WIDTH
+    return runCount * TRACK_WIDTH / TOTAL_STEPS;
 }
 
-void RunningScreen::enterState(RNState s) {
-    state = s;
-    stateEntered = std::chrono::steady_clock::now();
-}
-
-int RunningScreen::calcExp() const {
-    if (keyCount >= 60) return 15;
-    if (keyCount >= 45) return 12;
-    if (keyCount >= 30) return 8;
-    if (keyCount >= 15) return 4;
-    return 1;
-}
+// ══════════════════════════════════════════════════════════════════
+//  render
+// ══════════════════════════════════════════════════════════════════
 
 void RunningScreen::render(const Character& player) {
     Renderer::clearCanvas();
-    Renderer::drawTopMenu(player, "2026-05-04");
+    Renderer::drawTopMenu(player);
 
-    auto now = std::chrono::steady_clock::now();
-    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - stateEntered).count();
+    // 애니메이션 만료 (200ms)
+    if (stepAnim) {
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - stepTime).count();
+        if (ms >= 200) stepAnim = false;
+    }
 
-    // title bar
     std::cout << "\n";
-    if (state == RNState::RUNNING) {
-        long long runElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now - runStart).count();
-        int msLeft = std::max(0LL, (long long)totalTimeMs - runElapsed);
-        std::cout << "  [ 달리기 ]    남은 시간: " << (msLeft / 1000) << "초    카운트: " << keyCount << "\n";
+    std::cout << "  [ 달리기 훈련 ]    진행: " << runCount << " / " << TOTAL_STEPS << " 걸음\n";
+    std::cout << "  ";
+    for (int i = 0; i < 30; ++i)
+        std::cout << (i < runCount ? "▶" : "─");
+    std::cout << "\n";
+    std::cout << "------------------------------------------------------------------------------------------------------------------------\n\n\n";
+
+    // 트랙 렌더
+    int pos = charPos();
+    std::string face = stepAnim ? "(^o^)" : "(^_^)";
+
+    // 윗줄: 캐릭터 표정
+    std::cout << "  |" << std::string(pos, ' ') << face
+              << std::string(std::max(0, TRACK_WIDTH - pos - 5), ' ') << "|\n";
+
+    // 트랙 바닥
+    std::cout << "  |";
+    for (int i = 0; i < TRACK_WIDTH; ++i) {
+        if (i == pos || i == pos + 1 || i == pos + 2 || i == pos + 3 || i == pos + 4)
+            std::cout << "=";
+        else if (i == TRACK_WIDTH - 1)
+            std::cout << "G";
+        else
+            std::cout << "-";
+    }
+    std::cout << "|\n";
+
+    // 표지
+    std::cout << "  |" << "S" << std::string(TRACK_WIDTH - 2, ' ') << "G|\n\n\n";
+    std::cout << "  S=출발  G=결승선\n\n";
+
+    if (state == RNState::DONE) {
+        std::cout << Renderer::GREEN
+                  << "  결승선 통과! 체력(HP) +10 상승!\n" << Renderer::RESET;
+        std::cout << "  아무 키나 눌러 훈련 종료\n";
+        for (int i = 0; i < 8; ++i) std::cout << "\n";
+        Renderer::drawBottomMenu({"훈련 완료 (클릭)"});
     } else {
-        std::cout << "  [ 달리기 ]    A ↔ D 교대 입력 또는 스페이스\n";
+        std::cout << "  \"달리기\" 버튼을 " << TOTAL_STEPS << "번 눌러 결승선에 도착하세요!\n";
+        for (int i = 0; i < 9; ++i) std::cout << "\n";
+        Renderer::drawBottomMenu({"달리기", "돌아가기"});
     }
-    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
-
-    if (state == RNState::INTRO) {
-        std::cout << "\n\n\n";
-        std::cout << "               달리기 훈련을 시작합니다!\n\n";
-        std::cout << "               A 키와 D 키를 빠르게 교대로 누르거나 스페이스를 연타하세요.\n\n";
-        std::cout << "               잠시 후 카운트다운이 시작됩니다...\n";
-
-    } else if (state == RNState::COUNTDOWN) {
-        std::cout << "\n\n\n\n";
-        if (countdown > 0) {
-            int pad = (118 - 1) / 2;
-            std::cout << "\033[33m" << std::string(pad, ' ') << countdown << "\033[0m\n";
-        } else {
-            int pad = (118 - 3) / 2;
-            std::cout << "\033[32m" << std::string(pad, ' ') << "GO!" << "\033[0m\n";
-        }
-
-    } else if (state == RNState::RUNNING) {
-        // draw animation frame centered
-        const auto& frame = FRAMES[animFrame];
-        int maxW = 0;
-        for (const auto& line : frame) {
-            int w = Renderer::getDisplayWidth(line);
-            if (w > maxW) maxW = w;
-        }
-        int artPad = (116 - maxW) / 2;
-        if (artPad < 0) artPad = 0;
-        for (const auto& line : frame) {
-            std::cout << std::string(artPad, ' ') << line << "\n";
-        }
-        std::cout << "\n";
-        std::cout << "  A ↔ D  교대 입력  또는  스페이스\n";
-
-    } else if (state == RNState::RESULT) {
-        int exp = calcExp();
-        std::cout << "\n\n\n";
-        std::cout << "  훈련 완료!\n\n";
-        std::cout << "  총 입력 횟수: " << keyCount << "\n\n";
-        std::cout << "  체력 경험치 +" << exp << "\n\n";
-        std::cout << "  아무 키나 눌러 돌아가기\n";
-    }
-
-    Renderer::drawBottomMenu({"포기 (q)"});
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  handleInput
+// ══════════════════════════════════════════════════════════════════
+
 void RunningScreen::handleInput(GameEngine& engine, Character& player, const InputEvent& event) {
-    auto now = std::chrono::steady_clock::now();
-    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - stateEntered).count();
-
-    if (event.type == InputType::KEYBOARD && event.key == 'q') {
-        engine.changeScreen(std::make_unique<TrainingScreen>());
-        return;
-    }
-
-    if (state == RNState::INTRO) {
-        if (elapsed >= 2000) {
-            countdown = 3;
-            enterState(RNState::COUNTDOWN);
-        }
-        return;
-    }
-
-    if (state == RNState::COUNTDOWN) {
-        if (elapsed >= 1000) {
-            --countdown;
-            enterState(RNState::COUNTDOWN);
-            if (countdown < 0) {
-                runStart = std::chrono::steady_clock::now();
-                enterState(RNState::RUNNING);
-            }
-        }
-        return;
-    }
-
-    if (state == RNState::RUNNING) {
-        long long runElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now - runStart).count();
-        if (runElapsed >= totalTimeMs) {
-            enterState(RNState::RESULT);
-            return;
-        }
-
-        if (event.type == InputType::KEYBOARD) {
-            char k = event.key;
-            bool valid = false;
-            if (k == 'a' || k == 'A') {
-                if (lastKey != 'a') { valid = true; lastKey = 'a'; }
-            } else if (k == 'd' || k == 'D') {
-                if (lastKey != 'd') { valid = true; lastKey = 'd'; }
-            } else if (k == ' ') {
-                valid = true;
-            }
-            if (valid) {
-                ++keyCount;
-                animFrame = 1 - animFrame;
-            }
-        }
-        return;
-    }
-
-    if (state == RNState::RESULT) {
-        if (event.type == InputType::KEYBOARD) {
-            player.trainHp(calcExp());
+    if (state == RNState::DONE) {
+        if (event.type == InputType::MOUSE_PRESS) {
+            player.trainHp(10);
             engine.changeScreen(std::make_unique<TrainingScreen>());
         }
+        return;
+    }
+
+    int choice = -1;
+    if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
+        if (event.y >= 30) {
+            int btnW = 118 / 2;
+            int btn  = (event.x - 1) / btnW;
+            if (btn == 0) choice = 1; // 달리기
+            else          choice = 0; // 돌아가기
+        }
+    }
+
+    if (choice == 1) {
+        ++runCount;
+        stepAnim = true;
+        stepTime = std::chrono::steady_clock::now();
+        state = RNState::RUNNING;
+        if (runCount >= TOTAL_STEPS) {
+            state = RNState::DONE;
+        }
+    } else if (choice == 0) {
+        engine.changeScreen(std::make_unique<TrainingScreen>());
     }
 }

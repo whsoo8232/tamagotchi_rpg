@@ -9,7 +9,7 @@
 
 void TrainingScreen::render(const Character& player) {
     Renderer::clearCanvas();
-    Renderer::drawTopMenu(player, "2026-05-04");
+    Renderer::drawTopMenu(player);
 
     std::cout << std::endl;
     Renderer::drawMainCharacter();
@@ -20,23 +20,20 @@ void TrainingScreen::render(const Character& player) {
         std::cout << "\n\n";
     }
 
-    Renderer::drawBottomMenu({"샌드백치기 (1)", "달리기 (2)", "반응속도 (3)", "돌아가기 (0)"});
+    Renderer::drawBottomMenu({"샌드백치기", "달리기", "반응속도", "돌아가기"});
 }
 
 void TrainingScreen::handleInput(GameEngine& engine, Character& player, const InputEvent& event) {
     int choice = -1;
 
-    if (event.type == InputType::KEYBOARD) {
-        if (event.key == '1') choice = 1;
-        else if (event.key == '2') choice = 2;
-        else if (event.key == '3') choice = 3;
-        else if (event.key == '0' || event.key == 'q') choice = 0;
-    } else if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
+    if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
         if (event.y >= 30) {
-            if (event.x >= 1 && event.x <= 30) choice = 1;
-            else if (event.x >= 31 && event.x <= 60) choice = 2;
-            else if (event.x >= 61 && event.x <= 90) choice = 3;
-            else if (event.x >= 91) choice = 0;
+            int btnW = 118 / 4;
+            int btn  = (event.x - 1) / btnW;
+            if (btn == 0) choice = 1;
+            else if (btn == 1) choice = 2;
+            else if (btn == 2) choice = 3;
+            else               choice = 0;
         }
     }
 

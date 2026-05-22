@@ -5,214 +5,199 @@
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
-#include <sstream>
-#include <numeric>
-#include <iomanip>
 
 ReactionScreen::ReactionScreen()
-    : state(RCState::INTRO), round(0), totalRounds(5),
-      isStar(true), consecutiveX(0), inputReceived(false),
-      signalAreaX(40), signalAreaY(2), xAvoidSuccess(0),
-      waitDuration(1500) {
+    : state(RCState::INTRO), waitMs(0), reactionMs(-1), agiGain(0) {
     std::srand(static_cast<unsigned>(std::time(nullptr)));
     stateEntered = std::chrono::steady_clock::now();
 }
 
-void ReactionScreen::enterState(RCState s) {
-    state = s;
-    stateEntered = std::chrono::steady_clock::now();
+long long ReactionScreen::elapsed() const {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - stateEntered).count();
 }
 
-void ReactionScreen::generateSignal() {
-    // 75% star, 25% X; but max 2 consecutive X
-    int roll = std::rand() % 100;
-    if (consecutiveX >= 2) {
-        isStar = true;
-    } else {
-        isStar = (roll < 75);
-    }
-    consecutiveX = isStar ? 0 : consecutiveX + 1;
-
-    signalAreaX = 20 + std::rand() % 60; // col 20-79
-    signalAreaY = std::rand() % 5;       // row 0-4 within signal box
-    inputReceived = false;
-    signalStart = std::chrono::steady_clock::now();
+long long ReactionScreen::signalElapsed() const {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - signalStart).count();
 }
 
-long long ReactionScreen::averageReaction() const {
-    if (reactionTimes.empty()) return 9999;
-    long long sum = 0;
-    for (auto t : reactionTimes) sum += t;
-    return sum / (long long)reactionTimes.size();
+// 반응 시간 → 민첩 획득량
+int ReactionScreen::calcAgiGain(long long ms) const {
+    if (ms <  100) return 5;
+    if (ms <  200) return 4;
+    if (ms <  400) return 3;
+    if (ms <  500) return 2;
+    if (ms <  600) return 1;
+    return 0; // 실패
 }
 
-int ReactionScreen::calcExp() const {
-    if (reactionTimes.size() < 2) return 0; // 훈련 실패
-    long long avg = averageReaction();
-    if (avg < 150) return 15;
-    if (avg < 250) return 12;
-    if (avg < 350) return 8;
-    if (avg < 500) return 4;
-    return 1;
-}
+// ══════════════════════════════════════════════════════════════════
+//  render
+// ══════════════════════════════════════════════════════════════════
 
 void ReactionScreen::render(const Character& player) {
     Renderer::clearCanvas();
-    Renderer::drawTopMenu(player, "2026-05-04");
+    Renderer::drawTopMenu(player);
 
-    auto now = std::chrono::steady_clock::now();
-    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - stateEntered).count();
-
-    // title bar
     std::cout << "\n";
-    std::cout << "  [ 반응속도 테스트 ]    측정: " << round << "/" << totalRounds << "회\n";
-    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+    std::cout << "  [ 반응속도 훈련 ]\n";
+    std::cout << "------------------------------------------------------------------------------------------------------------------------\n\n\n\n";
 
-    // signal box (7 rows, ASCII frame)
-    const int boxRows = 7;
-    const int boxCols = 80;
-    const int boxLeft = 20;
-    const int symW = 2; // ★ and ✕ are 2-column wide in most terminals
-
-    std::cout << "  " << std::string(boxLeft, ' ') << "+" << std::string(boxCols, '-') << "+\n";
-    for (int r = 0; r < boxRows; ++r) {
-        std::cout << "  " << std::string(boxLeft, ' ') << "|";
-        if (state == RCState::SIGNAL && r == signalAreaY) {
-            int sx = signalAreaX - boxLeft;
-            if (sx < 0) sx = 0;
-            if (sx > boxCols - symW) sx = boxCols - symW;
-            std::cout << std::string(sx, ' ');
-            if (isStar) std::cout << "\033[33m★\033[0m";
-            else        std::cout << "\033[31m✕\033[0m";
-            int remaining = boxCols - sx - symW;
-            if (remaining > 0) std::cout << std::string(remaining, ' ');
-        } else {
-            std::cout << std::string(boxCols, ' ');
-        }
-        std::cout << "|\n";
-    }
-    std::cout << "  " << std::string(boxLeft, ' ') << "+" << std::string(boxCols, '-') << "+\n";
-
-    // status line
-    std::cout << "\n";
-    if (state == RCState::INTRO) {
-        std::cout << "  ★ 가 나타나면 스페이스 또는 엔터를 누르세요.  ✕ 는 누르지 마세요!\n";
-    } else if (state == RCState::WAITING) {
-        std::cout << "  준비하세요...\n";
+    // 말풍선 + 캐릭터
+    std::string bubble;
+    std::string bubbleColor;
+    if (state == RCState::INTRO || state == RCState::WAITING) {
+        bubble      = "  ╔══════════╗\n"
+                      "  ║  준비!  ║\n"
+                      "  ╚══════════╝";
+        bubbleColor = Renderer::BLUE;
     } else if (state == RCState::SIGNAL) {
-        if (isStar) std::cout << "\033[33m  ★  지금 누르세요!\033[0m\n";
-        else        std::cout << "\033[31m  ✕  누르지 마세요!\033[0m\n";
+        bubble      = "  ╔══════════╗\n"
+                      "  ║  지금!  ║\n"
+                      "  ╚══════════╝";
+        bubbleColor = Renderer::YELLOW;
     } else if (state == RCState::JUDGED) {
-        std::cout << "  " << lastStatus << "\n";
+        bubble      = "  ╔══════════╗\n"
+                      "  ║ " + judgeMsg + " ║\n"
+                      "  ╚══════════╝";
+        bubbleColor = (agiGain > 0) ? Renderer::GREEN : Renderer::RED;
+    } else {
+        bubble = "";
+        bubbleColor = "";
+    }
+
+    if (!bubble.empty()) {
+        std::cout << bubbleColor << bubble << Renderer::RESET << "\n\n";
+    }
+
+    // 캐릭터 아트 (간략)
+    std::cout << "           (^_^)\n";
+    std::cout << "           ( || )\n";
+    std::cout << "           /|  |\\\n\n";
+
+    // 상태 안내
+    if (state == RCState::INTRO) {
+        std::cout << "  \"지금!\" 말풍선이 바뀌면 \"지금!\" 버튼을 누르세요.\n";
+        std::cout << "  신호 전에 누르면 실패!\n";
+    } else if (state == RCState::WAITING) {
+        std::cout << "  집중하세요... 말풍선이 바뀌는 순간 누르세요!\n";
+    } else if (state == RCState::SIGNAL) {
+        long long se = signalElapsed();
+        std::cout << Renderer::YELLOW << "  ★ 지금 눌러! (" << se << "ms 경과)\n" << Renderer::RESET;
+    } else if (state == RCState::JUDGED) {
+        if (agiGain > 0)
+            std::cout << Renderer::GREEN << "  반응 시간: " << reactionMs << "ms → 민첩 +" << agiGain << "\n" << Renderer::RESET;
+        else if (reactionMs == -2)
+            std::cout << Renderer::RED << "  신호 전에 눌렀습니다! 실패\n" << Renderer::RESET;
+        else
+            std::cout << Renderer::RED << "  반응 시간: " << reactionMs << "ms → 너무 느려요! 실패\n" << Renderer::RESET;
     } else if (state == RCState::RESULT) {
-        int exp = calcExp();
-        long long avg = averageReaction();
-        if (reactionTimes.size() < 2) {
-            std::cout << "  \033[31m유효 측정값 부족 - 훈련 실패 (경험치 0)\033[0m\n";
+        if (agiGain > 0) {
+            std::cout << Renderer::GREEN << "  훈련 완료! 민첩 +" << agiGain << " 상승!\n" << Renderer::RESET;
+            std::cout << "  반응 시간: " << reactionMs << "ms\n";
         } else {
-            std::cout << "  평균 반응속도: " << avg << "ms    민첩 경험치 +" << exp << "\n";
+            std::cout << Renderer::RED << "  훈련 실패. 민첩 변화 없음.\n" << Renderer::RESET;
         }
-        std::cout << "  ✕ 회피 성공: " << xAvoidSuccess << "회\n";
-        std::cout << "\n  아무 키나 눌러 돌아가기\n";
+        std::cout << "\n  아무 키나 눌러 훈련 종료\n";
     }
 
-    // reaction times record
-    std::cout << "\n  기록: ";
-    for (int i = 0; i < totalRounds; ++i) {
-        std::cout << (i + 1) << ": ";
-        // We store in order, but we track per-round. For simplicity, show reactionTimes entries.
-        // Actually we need to track per-round. Let me show what's available.
-    }
-    // Simpler display: just show collected reaction times
-    std::cout << "\n  측정값: ";
-    for (size_t i = 0; i < reactionTimes.size(); ++i) {
-        std::cout << reactionTimes[i] << "ms  ";
-    }
-    if (reactionTimes.empty()) std::cout << "없음";
-    std::cout << "\n";
+    for (int i = 0; i < 8; ++i) std::cout << "\n";
 
-    Renderer::drawBottomMenu({"포기 (q)"});
+    if (state == RCState::RESULT)
+        Renderer::drawBottomMenu({"훈련 종료 (아무 키)"});
+    else
+        Renderer::drawBottomMenu({"지금! (스페이스)", "돌아가기 (q)"});
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  handleInput
+// ══════════════════════════════════════════════════════════════════
+
 void ReactionScreen::handleInput(GameEngine& engine, Character& player, const InputEvent& event) {
-    auto now = std::chrono::steady_clock::now();
-    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - stateEntered).count();
+    auto enterState = [&](RCState s) {
+        state = s;
+        stateEntered = std::chrono::steady_clock::now();
+    };
 
-    if (event.type == InputType::KEYBOARD && event.key == 'q') {
-        engine.changeScreen(std::make_unique<TrainingScreen>());
-        return;
-    }
-
-    if (state == RCState::INTRO) {
-        if (elapsed >= 2000) {
-            round = 0;
-            waitDuration = 1000 + std::rand() % 2501; // 1000-3500ms
-            enterState(RCState::WAITING);
+    // RESULT: 클릭 → 훈련 종료
+    if (state == RCState::RESULT) {
+        if (event.type == InputType::MOUSE_PRESS) {
+            if (agiGain > 0) player.trainAgility(agiGain);
+            engine.changeScreen(std::make_unique<TrainingScreen>());
         }
         return;
     }
 
+    // INTRO: 1.5초 후 WAITING으로
+    if (state == RCState::INTRO) {
+        if (elapsed() >= 1500) {
+            waitMs = 1000 + std::rand() % 2001; // 1000-3000ms
+            enterState(RCState::WAITING);
+        }
+        // 돌아가기 버튼 클릭
+        if (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
+            event.y >= 30 && event.x > 59) {
+            engine.changeScreen(std::make_unique<TrainingScreen>());
+        }
+        return;
+    }
+
+    // WAITING: 대기 시간 경과 → SIGNAL / 조기 클릭 → 실패
     if (state == RCState::WAITING) {
-        if (elapsed >= waitDuration) {
-            ++round;
-            generateSignal();
+        bool earlyClick = (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
+                           event.y >= 30 && event.x <= 59); // "지금!" 버튼 영역
+        bool backClick  = (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
+                           event.y >= 30 && event.x > 59);
+
+        if (backClick) {
+            engine.changeScreen(std::make_unique<TrainingScreen>());
+            return;
+        }
+        if (earlyClick) {
+            reactionMs = -2;
+            agiGain    = 0;
+            judgeMsg   = "실패";
+            enterState(RCState::JUDGED);
+            return;
+        }
+        if (elapsed() >= waitMs) {
+            signalStart = std::chrono::steady_clock::now();
             enterState(RCState::SIGNAL);
         }
         return;
     }
 
+    // SIGNAL: 0.6초 이내 "지금!" 버튼 클릭
     if (state == RCState::SIGNAL) {
-        long long sigElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now - signalStart).count();
+        long long se = signalElapsed();
 
-        bool pressed = (event.type == InputType::KEYBOARD &&
-                        (event.key == ' ' || event.key == '\r' || event.key == '\n'));
+        bool pressed = (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
+                        event.y >= 30 && event.x <= 59);
 
-        if (pressed && !inputReceived) {
-            inputReceived = true;
-            if (isStar) {
-                reactionTimes.push_back(sigElapsed);
-                lastStatus = "\033[33m별 잡기 성공! (" + std::to_string(sigElapsed) + "ms)\033[0m";
-            } else {
-                // ✕ 오반응
-                // add 50ms penalty to next star (just mark failure, don't add to times)
-                lastStatus = "\033[31m✕ 오반응! 해당 회차 무효\033[0m";
-            }
+        if (pressed) {
+            reactionMs = se;
+            agiGain    = calcAgiGain(se);
+            judgeMsg   = (agiGain > 0) ? "성공!" : "실패";
             enterState(RCState::JUDGED);
             return;
         }
 
-        if (sigElapsed >= 1500) {
-            // timeout
-            if (isStar) {
-                lastStatus = "\033[31mMISS - 시간 초과\033[0m";
-            } else {
-                // no press on ✕ = success
-                ++xAvoidSuccess;
-                lastStatus = "\033[32m✕ 회피 성공!\033[0m";
-            }
+        // 0.6초 초과 → 실패
+        if (se >= 600) {
+            reactionMs = se;
+            agiGain    = 0;
+            judgeMsg   = "실패";
             enterState(RCState::JUDGED);
         }
         return;
     }
 
+    // JUDGED: 1.5초 후 RESULT
     if (state == RCState::JUDGED) {
-        if (elapsed >= 1000) {
-            if (round >= totalRounds) {
-                enterState(RCState::RESULT);
-            } else {
-                waitDuration = 1000 + std::rand() % 2501;
-                enterState(RCState::WAITING);
-            }
+        if (elapsed() >= 1500) {
+            enterState(RCState::RESULT);
         }
         return;
-    }
-
-    if (state == RCState::RESULT) {
-        if (event.type == InputType::KEYBOARD) {
-            int exp = calcExp();
-            player.trainAgility(exp);
-            engine.changeScreen(std::make_unique<TrainingScreen>());
-        }
     }
 }
