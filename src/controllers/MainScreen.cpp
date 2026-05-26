@@ -22,8 +22,6 @@ static const char* DIALOGUES[] = {
     "나 오늘 잘생겼지?"
 };
 static const int  DIALOGUE_COUNT = 10;
-static const long long BUBBLE_MS = 3000;   // 말풍선 표시 지속 시간
-
 // 말풍선 위치 (kuchi art 0-indexed row 기준)
 static const int BUBBLE_TOP = 5;
 static const int BUBBLE_MID = 6;
@@ -52,12 +50,6 @@ static std::string bubbleBot() {
 MainScreen::MainScreen() : bubbleActive(false), bubbleIdx(0) {}
 
 void MainScreen::render(const Character& player) {
-    if (bubbleActive) {
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - bubbleStart).count();
-        if (ms >= BUBBLE_MS) bubbleActive = false;
-    }
-
     Renderer::clearCanvas();
     Renderer::drawTopMenu(player);
 
@@ -105,6 +97,5 @@ void MainScreen::handleInput(GameEngine& engine, Character& player, const InputE
     if (event.x >= 51 && event.x <= 110 && event.y >= 7 && event.y <= 38) {
         bubbleIdx    = std::rand() % DIALOGUE_COUNT;
         bubbleActive = true;
-        bubbleStart  = std::chrono::steady_clock::now();
     }
 }
