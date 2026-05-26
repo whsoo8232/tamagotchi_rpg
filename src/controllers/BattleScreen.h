@@ -5,6 +5,7 @@
 #include "../models/Monster.h"
 #include "../models/Item.h"
 #include <string>
+#include <chrono>
 
 enum class BattleState {
     STAGE_SELECT,   // 스테이지 선택
@@ -20,21 +21,27 @@ public:
     BattleScreen();
     void render(const Character& player) override;
     void handleInput(GameEngine& engine, Character& player, const InputEvent& event) override;
+    bool needsRedraw() const override {
+        return state == BattleState::COMBAT_MAIN && resultAnimating;
+    }
 
 private:
     BattleState state;
     Monster     enemy;
     int         selectedStage;
-    int         selectedItemIdx; // -1=없음, 0-3=ItemType
+    int         selectedItemIdx;   // -1=없음, 0-3=ItemType
     std::string battleLog;
     std::string turnResult;
     int         turnCount;
+    int         playerLastChoice;  // 0=대기, 1=가위, 2=바위, 3=보
+    int         enemyLastChoice;   // 0=대기, 1=가위, 2=바위, 3=보
+    bool        resultAnimating;   // 결과 표시 중 (2초 후 자동 복귀)
+    std::chrono::steady_clock::time_point resultStart;
 
     // ── 렌더 서브함수 ──────────────────────────────────────────
     void renderStageSelect(const Character& player);
     void renderItemSelect(const Character& player);
     void renderCombatMain(const Character& player);
-    void renderCombatResult(const Character& player);
     void renderBattleWin(const Character& player);
     void renderBattleLose(const Character& player);
 
@@ -42,7 +49,6 @@ private:
     void handleStageSelect(GameEngine& engine, Character& player, const InputEvent& event);
     void handleItemSelect(GameEngine& engine, Character& player, const InputEvent& event);
     void handleCombatMain(GameEngine& engine, Character& player, const InputEvent& event);
-    void handleCombatResult(GameEngine& engine, Character& player, const InputEvent& event);
     void handleBattleEnd(GameEngine& engine, Character& player, const InputEvent& event);
 
     // ── 전투 로직 ──────────────────────────────────────────────

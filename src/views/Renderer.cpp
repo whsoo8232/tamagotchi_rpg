@@ -2,6 +2,8 @@
 #include <iostream>
 #include <iomanip>
 #include <ctime>
+#include <fstream>
+#include <algorithm>
 
 const std::string Renderer::RED     = "\033[31m";
 const std::string Renderer::YELLOW  = "\033[33m";
@@ -54,6 +56,9 @@ int Renderer::getDisplayWidth(const std::string& str) {
                 // 브라유 점자 (U+2800-U+28FF): 1컬럼
                 if (c == 0xE2 && (c2 >= 0xA0 && c2 <= 0xBF))
                     width += 1;
+                // 블록 요소 (U+2580-U+25FF: ░▒▓█▀▄ 등): 1컬럼
+                else if (c == 0xE2 && c2 == 0x96)
+                    width += 1;
                 else
                     width += 2; // CJK 등 와이드 문자
             } else { width += 2; }
@@ -88,6 +93,42 @@ std::string Renderer::center(const std::string& str, int width) {
     int left  = total / 2;
     int right = total - left;
     return std::string(left, ' ') + str + std::string(right, ' ');
+}
+
+std::string Renderer::cropCenter(const std::string& str, int width) {
+    int total = getDisplayWidth(str);
+    if (total <= width) return str;
+    int skip = (total - width) / 2; // 양쪽에서 균등하게 제거
+
+    // skip display cols 이후 시작 바이트 탐색
+    int w = 0;
+    size_t start = 0;
+    for (size_t i = 0; i < str.size(); ) {
+        unsigned char c = (unsigned char)str[i];
+        int cw, step;
+        if      (c < 0x80) { cw=1; step=1; }
+        else if (c < 0xE0) { cw=1; step=2; }
+        else if (c < 0xF0) { cw=2; step=3; }
+        else               { cw=2; step=4; }
+        if (w + cw > skip) { start = i; break; }
+        w += cw; i += step;
+        if (w >= skip)     { start = i; break; }
+    }
+
+    // start 이후 width display cols 수집
+    int shown = 0;
+    size_t end = start;
+    for (size_t i = start; i < str.size(); ) {
+        unsigned char c = (unsigned char)str[i];
+        int cw, step;
+        if      (c < 0x80) { cw=1; step=1; }
+        else if (c < 0xE0) { cw=1; step=2; }
+        else if (c < 0xF0) { cw=2; step=3; }
+        else               { cw=2; step=4; }
+        if (shown + cw > width) break;
+        shown += cw; i += step; end = i;
+    }
+    return str.substr(start, end - start);
 }
 
 // ── 상단 헤더 ──────────────────────────────────────────────────────
@@ -166,190 +207,240 @@ void Renderer::drawBottomMenu(const std::vector<std::string>& options) {
     std::cout << sep << "\n";
 }
 
-// ── 캐릭터 아트 데이터 (drawMainCharacter / drawEatingCharacter 공유) ─
-static const char* KUCHI_ART[] = {
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⣴⠶⠶⠿⠛⠛⠛⠛⠛⠻⠶⢶⣤⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⢀⣴⠟⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⢷⣄⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⣰⡟⢁⣤⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣶⣄⠙⣷⡀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⣸⡟⠀⢾⣿⣿⣿⠀⠀⠀⢀⣀⣀⣀⣀⣀⣀⡀⠀⠀⠸⣿⣿⣿⠇⠈⢿⡄⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⣿⠁⠀⠀⠙⠛⢉⣴⠿⠟⠛⠛⠛⠛⠛⠛⠛⠛⠻⣶⡄⠈⠉⠁⠀⠀⠸⣷⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⣿⠀⠀⠀⠀⠀⢸⣿⡀⢀⣀⣀⣀⣀⣀⣀⣀⣀⢀⣿⡇⠀⠀⠀⠀⠀⠀⣿⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⣿⠀⠀⠀⠀⠀⢠⣿⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⣿⡄⠀⠀⠀⠀⠀⢀⣿⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⢿⡄⠀⠀⠀⠀⢸⣿⣀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣽⡇⠀⠀⠀⠀⠀⢸⣿⠀⠀⠀⠀",
-    "⠀⠀⠀⢀⣼⠷⠀⠀⠀⠀⠀⠙⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠉⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀",
-    "⠀⢀⣴⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣶⠈⢻⣆⠀",
-    "⢠⡿⠃⢠⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⣇⠀⢹⣧",
-    "⣿⠃⠀⢸⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣿⡄⣠⡿",
-    "⠹⢧⣤⣾⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡟⠋⠀",
-    "⠀⠀⠀⠘⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠃⠀⠀",
-    "⠀⠀⠀⠀⠹⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣼⠏⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠙⠷⣦⣄⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣀⣤⣴⡾⠋⠁⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⢿⡏⠛⠛⠻⠿⠿⢿⡿⠿⠛⠛⠛⠛⣿⡛⠛⠛⠛⠋⠉⣸⡇⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠈⠻⠶⣶⣤⣤⡶⠟⠁⠀⠀⠀⠀⠀⠘⠷⣦⣤⣤⣴⠾⠛⠀⠀⠀⠀⠀⠀⠀",
-};
-static const int  KUCHI_ROWS   = 18;
-static const int  KUCHI_INDENT = 62;   // (161 - 36) / 2 = 62 → 중앙 정렬
+// ══════════════════════════════════════════════════════════════════
+//  아트 파일 로더 (AA/ 디렉토리 기준)
+// ══════════════════════════════════════════════════════════════════
 
-// ── 메인 캐릭터 아트 (구치파치) ────────────────────────────────────
-
-void Renderer::drawMainCharacter() {
-    std::cout << "\n";
-    for (int i = 0; i < KUCHI_ROWS; ++i)
-        std::cout << std::string(KUCHI_INDENT, ' ') << KUCHI_ART[i] << "\n";
-    std::cout << "\n";
-}
-
-// ── 육성 애니메이션: 이모지 10개 주변 배치 ─────────────────────────
-// 구치파치(col 62~97, 행1~18) 상·하·좌·우 바로 주변에만 배치
-// row 0·19: 위아래, col 57: 좌, col 100: 우 (각 2col 여백 확보)
-// (row, col) 오름차순 정렬 필수
-
-struct EmojiPos { int row, col; };
-
-static const EmojiPos EMOJI_SCATTER[] = {
-    { 0, 69},{ 0, 84},          // ↑ 위쪽 중앙 2개
-    { 3, 57},{ 3,100},          // ← → 상단 부근
-    { 8, 57},{ 8,100},          // ← → 중간
-    {14, 57},{14,100},          // ← → 하단 부근
-    {19, 69},{19, 84},          // ↓ 아래쪽 중앙 2개
-};
-
-// 이모지 10개를 구치파치 주변에 배치하여 출력
-static void drawCharWithScatteredEmoji(const std::string& emoji) {
-    // emoji는 터미널에서 2컬럼 너비 (4바이트 UTF-8 이모지 기준)
-    for (int row = 0; row < 20; ++row) {
-        int curCol   = 0;
-        bool artDone = (row < 1 || row > 18); // 행0·19는 아트 없음
-
-        for (const auto& p : EMOJI_SCATTER) {
-            if (p.row != row) continue;
-
-            // 이 이모지가 아트 우측이면 먼저 아트를 출력
-            if (!artDone && p.col >= KUCHI_INDENT) {
-                if (KUCHI_INDENT > curCol)
-                    std::cout << std::string(KUCHI_INDENT - curCol, ' ');
-                std::cout << KUCHI_ART[row - 1];
-                curCol  = KUCHI_INDENT + 36;
-                artDone = true;
-            }
-
-            if (p.col > curCol)
-                std::cout << std::string(p.col - curCol, ' ');
-            std::cout << emoji;
-            curCol = p.col + 2;
-        }
-
-        // 이모지가 전부 좌측이었거나 해당 행에 이모지가 없는 아트 행
-        if (!artDone) {
-            if (KUCHI_INDENT > curCol)
-                std::cout << std::string(KUCHI_INDENT - curCol, ' ');
-            std::cout << KUCHI_ART[row - 1];
-        }
-
-        std::cout << "\n";
+// 파일에서 아트 줄을 읽어 앞뒤 빈 줄 제거 후 반환
+// maxRows > 0 이면 중앙 크롭
+static std::vector<std::string> loadArtFile(const std::string& path, int maxRows = 0) {
+    std::vector<std::string> lines;
+    std::ifstream f(path);
+    if (!f.is_open()) return lines;
+    std::string line;
+    while (std::getline(f, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        lines.push_back(line);
     }
-}
-
-// ── 밥 먹는 화면: 🍚 산란 ─────────────────────────────────────────
-void Renderer::drawEatingCharacter() {
-    drawCharWithScatteredEmoji("🍚");
-}
-
-// ── 목욕 화면: 🚿 산란 ───────────────────────────────────────────
-void Renderer::drawBathCharacter() {
-    drawCharWithScatteredEmoji("🚿");
-}
-
-// ── 놀이 화면: 🎉 산란 ───────────────────────────────────────────
-void Renderer::drawPlayCharacter() {
-    drawCharWithScatteredEmoji("🎉");
-}
-
-// ── 치료 화면: 💉 산란 ───────────────────────────────────────────
-void Renderer::drawTreatCharacter() {
-    drawCharWithScatteredEmoji("💉");
-}
-
-// ── 전투 대치 레이아웃 ─────────────────────────────────────────────
-//
-//  터미널 161컬럼 기준
-//  좌측 70col: 구치파치 중앙 정렬 (indent=17, art=36, rpad=17)
-//  │ (1col)
-//  우측 90col: 몬스터 아트 (3col 좌패딩 + 아트)
-//
-//  [자동 트리밍]
-//  몬스터 아트 line[0] = "공격 모션" 레이블 → 스킵
-//  앞/뒤 빈 행(⠀, 공백, 전각공백만 있는 줄) 제거 후 표시
-//  MAX_ART_ROWS(24) 초과 시에만 중앙 크롭
-
-void Renderer::drawCombatLayout(const std::vector<std::string>& monsterLines) {
-    // HP바(1) + 아트(24) + 턴정보(1) = 26 = CONTENT_H
-    // 분리선 제거로 24행 확보:  art2=20 art4=22 art3/5=24 art1=25(1행 크롭)
-    static const int MAX_ART_ROWS  = 24;
-    const int LEFT_W       = 70;
-    const int playerIndent = (LEFT_W - 36) / 2;          // 17
-    const int playerRPad   = LEFT_W - playerIndent - 36;  // 17
-    const int monsterPad   = 3;
-
-    // ── 빈 줄 판별 (⠀=U+2800, 공백, 　=U+3000 만 있으면 빈 줄) ──
-    auto isBlank = [](const std::string& line) -> bool {
-        for (size_t i = 0; i < line.size(); ) {
-            unsigned char c = (unsigned char)line[i];
-            if (c == 0x20) { ++i; continue; }
-            if (c == 0xE2 && i+2 < line.size() &&
-                (unsigned char)line[i+1] == 0xA0 &&
-                (unsigned char)line[i+2] == 0x80) { i += 3; continue; } // ⠀
-            if (c == 0xE3 && i+2 < line.size() &&
-                (unsigned char)line[i+1] == 0x80 &&
-                (unsigned char)line[i+2] == 0x80) { i += 3; continue; } //
-            return false;
-        }
+    // 앞뒤 빈 줄 제거
+    auto isBlank = [](const std::string& s) {
+        for (unsigned char c : s) if (c > ' ') return false;
         return true;
     };
-
-    // ── 레이블(line0) 스킵 + 앞뒤 빈 줄 트리밍 ───────────────────
-    int mFirst = monsterLines.empty() ? 0 : 1;
-    while (mFirst < (int)monsterLines.size() && isBlank(monsterLines[mFirst]))
-        ++mFirst;
-    int mLast = (int)monsterLines.size() - 1;
-    while (mLast > mFirst && isBlank(monsterLines[mLast]))
-        --mLast;
-    int mCount = (mFirst <= mLast) ? (mLast - mFirst + 1) : 0;
-
-    // MAX_ART_ROWS 초과 시 중앙 크롭
-    if (mCount > MAX_ART_ROWS) {
-        mFirst += (mCount - MAX_ART_ROWS) / 2;
-        mCount  = MAX_ART_ROWS;
+    while (!lines.empty() && isBlank(lines.front())) lines.erase(lines.begin());
+    while (!lines.empty() && isBlank(lines.back()))  lines.pop_back();
+    // 중앙 크롭
+    if (maxRows > 0 && (int)lines.size() > maxRows) {
+        int skip = ((int)lines.size() - maxRows) / 2;
+        lines.erase(lines.begin(), lines.begin() + skip);
+        lines.resize(maxRows);
     }
-
-    // 구치파치(18행)를 MAX_ART_ROWS 안에서 수직 중앙 정렬
-    const int playerTopPad = (MAX_ART_ROWS - KUCHI_ROWS) / 2; // (24-18)/2 = 3
-
-    // 몬스터 아트를 MAX_ART_ROWS 안에서 수직 중앙 정렬
-    const int mTopPad = (MAX_ART_ROWS - mCount) / 2;
-
-    for (int row = 0; row < MAX_ART_ROWS; ++row) {
-        // 좌측: 구치파치 (상하 3행 패딩으로 중앙 정렬)
-        int pRow = row - playerTopPad;
-        if (pRow >= 0 && pRow < KUCHI_ROWS) {
-            std::cout << std::string(playerIndent, ' ')
-                      << KUCHI_ART[pRow]
-                      << std::string(playerRPad, ' ');
-        } else {
-            std::cout << std::string(LEFT_W, ' ');
-        }
-
-        // 세로 구분선
-        std::cout << "│";
-
-        // 우측: 몬스터 아트 (수직 중앙 정렬)
-        int mRow = row - mTopPad;
-        if (mRow >= 0 && mRow < mCount)
-            std::cout << std::string(monsterPad, ' ') << monsterLines[mFirst + mRow];
-
-        std::cout << "\n";
-    }
+    return lines;
 }
+
+// ── 아트 캐시 (최초 호출 시 파일 로드) ──────────────────────────────
+static const std::vector<std::string>& kuchiArt() {
+    static auto v = loadArtFile("AA/kuchipatchi.txt"); // 32행, 크롭 불필요
+    return v;
+}
+static const std::vector<std::string>& eatingArt() {
+    static auto v = loadArtFile("AA/chicken.txt");  // 30행
+    return v;
+}
+static const std::vector<std::string>& bathArt() {
+    static auto v = loadArtFile("AA/bath.txt");     // 28행
+    return v;
+}
+static const std::vector<std::string>& playArt() {
+    static auto v = loadArtFile("AA/toy.txt");      // 22행
+    return v;
+}
+static const std::vector<std::string>& treatArt() {
+    static auto v = loadArtFile("AA/syringe.txt");  // 30행
+    return v;
+}
+
+// ── 아트 수평 중앙 정렬 출력 ─────────────────────────────────────────
+// artVWidth: 아트 파일의 최대 시각 너비(컬럼)
+// topBlanks/bottomBlanks: 아트 위아래에 삽입할 빈 줄 수
+static void printArtCentered(const std::vector<std::string>& art,
+                             int artVWidth, int topBlanks, int bottomBlanks) {
+    int indent = std::max(0, (161 - artVWidth) / 2);
+    for (int i = 0; i < topBlanks;    ++i) std::cout << "\n";
+    for (const auto& line : art)
+        std::cout << std::string(indent, ' ') << line << "\n";
+    for (int i = 0; i < bottomBlanks; ++i) std::cout << "\n";
+}
+
+// ── 메인 캐릭터 아트 (구치파치, kuchipatchi.txt) ──────────────────────
+// 2+32+2 = 36행 = CONTENT_H, 시각 너비 60col → indent=(161-60)/2=50
+void Renderer::drawMainCharacter() {
+    printArtCentered(kuchiArt(), 60, 2, 2);
+}
+
+// ── 밥 먹는 화면 (chicken.txt, 30행) ─────────────────────────────────
+// 3+30+3 = 36행 = CONTENT_H
+void Renderer::drawEatingCharacter() {
+    printArtCentered(eatingArt(), 60, 3, 3);
+}
+
+// ── 목욕 화면 (bath.txt, 28행) ───────────────────────────────────────
+// 4+28+4 = 36행 = CONTENT_H
+void Renderer::drawBathCharacter() {
+    printArtCentered(bathArt(), 60, 4, 4);
+}
+
+// ── 놀이 화면 (toy.txt, 22행) ────────────────────────────────────────
+// 7+22+7 = 36행 = CONTENT_H
+void Renderer::drawPlayCharacter() {
+    printArtCentered(playArt(), 60, 7, 7);
+}
+
+// ── 치료 화면 (syringe.txt, 30행) ────────────────────────────────────
+// 3+30+3 = 36행 = CONTENT_H
+void Renderer::drawTreatCharacter() {
+    printArtCentered(treatArt(), 60, 3, 3);
+}
+
+// ── 몬스터 아트 캐시 (스테이지 1-5, 기본/스몰) ──────────────────────
+
+static const std::vector<std::string>& monsterArtCache(int stage) {
+    static std::vector<std::vector<std::string>> cache(5);
+    static std::vector<bool> loaded(5, false);
+    int idx = stage - 1;
+    if (idx < 0 || idx > 4) { static std::vector<std::string> empty; return empty; }
+    if (!loaded[idx]) {
+        cache[idx] = loadArtFile("AA/monster" + std::to_string(stage) + ".txt");
+        loaded[idx] = true;
+    }
+    return cache[idx];
+}
+
+static const std::vector<std::string>& monsterSmallArtCache(int stage) {
+    static std::vector<std::vector<std::string>> cache(5);
+    static std::vector<bool> loaded(5, false);
+    int idx = stage - 1;
+    if (idx < 0 || idx > 4) { static std::vector<std::string> empty; return empty; }
+    if (!loaded[idx]) {
+        cache[idx] = loadArtFile("AA/monster" + std::to_string(stage) + "_small.txt");
+        loaded[idx] = true;
+    }
+    return cache[idx];
+}
+
+const std::vector<std::string>& Renderer::getMonsterArt(int stage) {
+    return monsterArtCache(stage);
+}
+const std::vector<std::string>& Renderer::getMonsterSmallArt(int stage) {
+    return monsterSmallArtCache(stage);
+}
+
+// ── 가위바위보 아트 캐시 ──────────────────────────────────────────────
+
+static const std::vector<std::string>& scissorsArt() {
+    static auto v = loadArtFile("AA/scissors.txt"); // 15행, 40col
+    return v;
+}
+static const std::vector<std::string>& rockArt() {
+    static auto v = loadArtFile("AA/rock.txt");     // 10행, 40col
+    return v;
+}
+static const std::vector<std::string>& paperArt() {
+    static auto v = loadArtFile("AA/paper.txt");    // 14행, 40col
+    return v;
+}
+
+const std::vector<std::string>& Renderer::getPlayerArt() {
+    return kuchiArt();
+}
+const std::vector<std::string>& Renderer::getRPSArt(int choice) {
+    if (choice == 1) return scissorsArt();
+    if (choice == 2) return rockArt();
+    return paperArt();
+}
+
+// ── 검/갑옷 아트 캐시 (sword1-5 / armor1-5) ─────────────────────────────
+static const std::vector<std::string>& swordArtCached(int tier) {
+    static std::vector<std::vector<std::string>> cache(5);
+    static std::vector<bool> loaded(5, false);
+    int idx = tier - 1;
+    if (idx < 0 || idx > 4) { static std::vector<std::string> empty; return empty; }
+    if (!loaded[idx]) { cache[idx] = loadArtFile("AA/sword" + std::to_string(tier) + ".txt"); loaded[idx] = true; }
+    return cache[idx];
+}
+const std::vector<std::string>& Renderer::getSwordArt(int tier) { return swordArtCached(tier); }
+
+static const std::vector<std::string>& armorArtCached(int tier) {
+    static std::vector<std::vector<std::string>> cache(5);
+    static std::vector<bool> loaded(5, false);
+    int idx = tier - 1;
+    if (idx < 0 || idx > 4) { static std::vector<std::string> empty; return empty; }
+    if (!loaded[idx]) { cache[idx] = loadArtFile("AA/armor" + std::to_string(tier) + ".txt"); loaded[idx] = true; }
+    return cache[idx];
+}
+const std::vector<std::string>& Renderer::getArmorArt(int tier) { return armorArtCached(tier); }
+
+// ── 훈련 아트 캐시 ───────────────────────────────────────────────────────
+static const std::vector<std::string>& punchingBagArtCache() {
+    static auto v = loadArtFile("AA/punchingbag.txt");
+    return v;
+}
+const std::vector<std::string>& Renderer::getPunchingBagArt() { return punchingBagArtCache(); }
+
+static const std::vector<std::string>& finishLineArtCache() {
+    static auto v = loadArtFile("AA/finishline.txt");
+    return v;
+}
+const std::vector<std::string>& Renderer::getFinishLineArt() { return finishLineArtCache(); }
+
+static const std::vector<std::string>& targetArtCache() {
+    static auto v = loadArtFile("AA/target.txt");
+    return v;
+}
+const std::vector<std::string>& Renderer::getTargetArt() { return targetArtCache(); }
+
+static const std::vector<std::string>& endingArtCache(int idx) {
+    static const char* files[5] = {
+        "AA/hero_kuchipatchi.txt",
+        "AA/starve_kuchipatchi.txt",
+        "AA/runaway_kuchipatchi.txt",
+        "AA/trash_kuchipatchi.txt",
+        "AA/hospital_kuchipatchi.txt"
+    };
+    static std::vector<std::vector<std::string>> cache(5);
+    static std::vector<bool> loaded(5, false);
+    if (idx < 0 || idx >= 5) { static std::vector<std::string> empty; return empty; }
+    if (!loaded[idx]) { cache[idx] = loadArtFile(files[idx]); loaded[idx] = true; }
+    return cache[idx];
+}
+const std::vector<std::string>& Renderer::getEndingArt(int idx) { return endingArtCache(idx); }
+
+// ── 아이템 아트 캐시 (potion_power / potion_agility / tether / shield) ───
+static const std::vector<std::string>& itemArtCached(int idx) {
+    static const char* files[4] = {
+        "AA/potion_power.txt", "AA/potion_agility.txt",
+        "AA/tether.txt", "AA/shield.txt"
+    };
+    static std::vector<std::vector<std::string>> cache(4);
+    static std::vector<bool> loaded(4, false);
+    if (idx < 0 || idx >= 4) { static std::vector<std::string> empty; return empty; }
+    if (!loaded[idx]) { cache[idx] = loadArtFile(files[idx]); loaded[idx] = true; }
+    return cache[idx];
+}
+const std::vector<std::string>& Renderer::getItemArt(int idx) { return itemArtCached(idx); }
+
+// ── 전투 결과 아트 ─────────────────────────────────────────────────
+static const std::vector<std::string>& winArt() {
+    static auto v = loadArtFile("AA/win.txt");  // 17행, 100col
+    return v;
+}
+static const std::vector<std::string>& loseArt() {
+    static auto v = loadArtFile("AA/lose.txt"); // 16행, 100col
+    return v;
+}
+const std::vector<std::string>& Renderer::getWinArt()  { return winArt();  }
+const std::vector<std::string>& Renderer::getLoseArt() { return loseArt(); }
+
 
 // ── 메시지 / 디버그 ────────────────────────────────────────────────
 

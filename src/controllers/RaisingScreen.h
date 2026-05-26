@@ -9,6 +9,7 @@ class RaisingScreen : public Screen {
 public:
     void render(const Character& player) override;
     void handleInput(GameEngine& engine, Character& player, const InputEvent& event) override;
+    bool needsRedraw() const override { return animating; }
 private:
     bool animating = false;
     int animType = 0;

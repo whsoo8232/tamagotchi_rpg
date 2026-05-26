@@ -14,6 +14,7 @@ public:
     int getAttack() const { return attack; }
     int getEvasion() const { return evasion; }
     std::string getAscii() const { return ascii; }
+    int getStage() const { return stageNum; }
 
     void takeDamage(int damage);
     bool isAlive() const { return hp > 0; }
@@ -27,6 +28,7 @@ private:
     int attack;
     int evasion;
     std::string ascii;
+    int stageNum = 0;
 };
 
 #endif

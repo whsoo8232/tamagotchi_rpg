@@ -4,9 +4,9 @@
 
 Character::Character(std::string name)
     : name(name),
-      hunger(50), happiness(50), cleanliness(50), health(50),
-      money(1000),
-      attack(10), hp(100), maxHp(100), agility(5),
+      hunger(70), happiness(70), cleanliness(70), health(70),
+      money(500),
+      attack(20), hp(100), maxHp(100), agility(5),
       level(1), exp(0), clearedStage(0),
       swordTier(SwordTier::BRANCH), armorTier(ArmorTier::SHABBY),
       itemCounts{0, 0, 0, 0} {}
@@ -108,6 +108,15 @@ void Character::takeDamage(int rawDamage) {
 
 void Character::restoreHp() {
     hp = maxHp;
+}
+
+void Character::afterBattle() {
+    health -= 1;
+    int which = std::rand() % 3;
+    if      (which == 0) hunger      -= 1;
+    else if (which == 1) happiness   -= 1;
+    else                 cleanliness -= 1;
+    clampStats();
 }
 
 bool Character::isEndingCondition() const {

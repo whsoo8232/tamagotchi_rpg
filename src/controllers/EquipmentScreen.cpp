@@ -11,7 +11,7 @@ EquipmentScreen::EquipmentScreen()
 }
 
 int EquipmentScreen::mouseChoice(const InputEvent& event, int btnCount) {
-    if (event.type == InputType::MOUSE_PRESS && event.button == 0 && event.y >= 31) {
+    if (event.type == InputType::MOUSE_PRESS && event.button == 0 && event.y >= 41) {
         int w = 158 / btnCount;
         return (event.x - 1) / w; // 0-indexed
     }
@@ -31,60 +31,155 @@ void EquipmentScreen::renderMain(const Character& player) {
     Renderer::clearCanvas();
     Renderer::drawTopMenu(player);
 
-    // ── 2컬럼 레이아웃: 검(58) │ 갑옷(58) ─────────────────────
+    // ── 검/갑옷 섹션 ──────────────────────────────────────────────
+    // [아트:44][텍스트:36]│[아트:44][텍스트:36] = 161col
+    static const int ART_W   = 38;
+    static const int TEXT_W  = 42;
+    static const int MAX_ART = 16; // 아트 최대 표시 행
+
+    int sT = (int)player.getSwordTier();
+    int aT = (int)player.getArmorTier();
+    bool sMax = (sT >= 4);
+    bool aMax = (aT >= 4);
+
     auto tierBar = [](int tier) -> std::string {
         std::string s = "[";
         for (int i = 0; i < 5; ++i) s += (i <= tier) ? "■" : "□";
         return s + "]";
     };
 
-    int swordT = (int)player.getSwordTier();
-    int armorT = (int)player.getArmorTier();
-    bool swordMax = (swordT >= 4);
-    bool armorMax = (armorT >= 4);
-
-    std::vector<std::pair<std::string,std::string>> rows = {
-        {"  [ 검 ]", "  [ 갑옷 ]"},
-        {"", ""},
-        {"  현재: " + SWORD_TABLE[swordT].name + " " + tierBar(swordT),
-         "  현재: " + ARMOR_TABLE[armorT].name + " " + tierBar(armorT)},
-        {"  공격 보너스: +" + std::to_string(SWORD_TABLE[swordT].attackBonus),
-         "  방어 감소  : -" + std::to_string(ARMOR_TABLE[armorT].defenseBonus)},
-        {"", ""},
-        {swordMax ? "  [최대 강화 완료]"
-                  : ("  다음: " + SWORD_TABLE[swordT+1].name),
-         armorMax ? "  [최대 강화 완료]"
-                  : ("  다음: " + ARMOR_TABLE[armorT+1].name)},
-        {swordMax ? "" : ("  비용: " + std::to_string(SWORD_TABLE[swordT].upgradeCost) + "원"),
-         armorMax ? "" : ("  비용: " + std::to_string(ARMOR_TABLE[armorT].upgradeCost) + "원")},
-        {swordMax ? "" : ("  성공: " + std::to_string(SWORD_TABLE[swordT].upgradeChance) + "%"),
-         armorMax ? "" : ("  성공: " + std::to_string(ARMOR_TABLE[armorT].upgradeChance) + "%")},
+    std::vector<std::string> sTxt = {
+        "[ 검 ]", "",
+        "현재: " + SWORD_TABLE[sT].name + " " + tierBar(sT),
+        "공격 보너스: +" + std::to_string(SWORD_TABLE[sT].attackBonus), "",
+        sMax ? "[최대 강화 완료]" : ("다음: " + SWORD_TABLE[sT+1].name),
+        sMax ? "" : ("비용: " + std::to_string(SWORD_TABLE[sT].upgradeCost) + "원"),
+        sMax ? "" : ("성공: " + std::to_string(SWORD_TABLE[sT].upgradeChance) + "%"),
+    };
+    std::vector<std::string> aTxt = {
+        "[ 갑옷 ]", "",
+        "현재: " + ARMOR_TABLE[aT].name + " " + tierBar(aT),
+        "방어 감소: -" + std::to_string(ARMOR_TABLE[aT].defenseBonus), "",
+        aMax ? "[최대 강화 완료]" : ("다음: " + ARMOR_TABLE[aT+1].name),
+        aMax ? "" : ("비용: " + std::to_string(ARMOR_TABLE[aT].upgradeCost) + "원"),
+        aMax ? "" : ("성공: " + std::to_string(ARMOR_TABLE[aT].upgradeChance) + "%"),
     };
 
-    for (int i = 0; i < (int)rows.size(); ++i) {
-        std::cout << Renderer::padRight(rows[i].first, 59) << "│"
-                  << rows[i].second << "\n";
+    const auto& sArt = Renderer::getSwordArt(sT + 1);
+    const auto& aArt = Renderer::getArmorArt(aT + 1);
+    int sRows = std::min((int)sArt.size(), MAX_ART);
+    int aRows = std::min((int)aArt.size(), MAX_ART);
+    int maxRows = std::max(std::max(sRows, aRows), (int)sTxt.size());
+
+    // 아트 크롭 시작 인덱스 (전체 아트 중 중앙 MAX_ART행 추출)
+    int sSrcOff = ((int)sArt.size() - sRows) / 2;
+    int aSrcOff = ((int)aArt.size() - aRows) / 2;
+
+    // 수직 중앙 정렬 오프셋
+    int sArtTop = (maxRows - sRows) / 2;
+    int aArtTop = (maxRows - aRows) / 2;
+
+    // 아트 수평 너비 → ART_W 안에서 중앙 정렬
+    int sArtW = 0, aArtW = 0;
+    for (const auto& l : sArt) sArtW = std::max(sArtW, Renderer::getDisplayWidth(l));
+    for (const auto& l : aArt) aArtW = std::max(aArtW, Renderer::getDisplayWidth(l));
+    int sIndent = std::max(0, (ART_W - sArtW) / 2);
+    int aIndent = std::max(0, (ART_W - aArtW) / 2);
+
+    std::cout << "\n"; // 검/갑옷 위 여백
+    for (int row = 0; row < maxRows; ++row) {
+        // 검 아트
+        {
+            int r = row - sArtTop;
+            std::string cell;
+            if (r >= 0 && r < sRows)
+                cell = std::string(sIndent, ' ') + sArt[sSrcOff + r];
+            std::cout << Renderer::padRight(cell, ART_W);
+        }
+        // 검 텍스트
+        {
+            std::string cell = (row < (int)sTxt.size()) ? " " + sTxt[row] : "";
+            std::cout << Renderer::padRight(cell, TEXT_W);
+        }
+        std::cout << "│";
+        // 갑옷 아트
+        {
+            int r = row - aArtTop;
+            std::string cell;
+            if (r >= 0 && r < aRows)
+                cell = std::string(aIndent, ' ') + aArt[aSrcOff + r];
+            std::cout << Renderer::padRight(cell, ART_W);
+        }
+        // 갑옷 텍스트
+        {
+            std::string cell = (row < (int)aTxt.size()) ? " " + aTxt[row] : "";
+            std::cout << Renderer::padRight(cell, TEXT_W);
+        }
+        std::cout << "\n";
     }
-    std::cout << "─────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────\n";
+
+    std::cout << "\n"; // 검/갑옷 아래 여백
+    // 구분선 (ART_W+TEXT_W=80, ─×80┼─×80)
+    {
+        std::string hline;
+        for (int i = 0; i < ART_W + TEXT_W; ++i) hline += "─";
+        std::cout << hline << "┼" << hline << "\n";
+    }
 
     // ── 아이템 인벤토리 ─────────────────────────────────────────
-    std::cout << "  [ 아이템 인벤토리 ]\n\n";
+    static const int ITEM_COL = 40; // 4 × 40 = 160
+    std::cout << "\n  [ 아이템 인벤토리 ]\n\n"; // 위아래 여백
+
+    int maxItemArtRows = 0;
+    std::vector<const std::vector<std::string>*> itemArts;
+    std::vector<int> itemArtWidths(ITEM_COUNT, 0);
     for (int i = 0; i < ITEM_COUNT; ++i) {
-        const auto& info = ITEM_TABLE[i];
-        int cnt = player.getItemCount((ItemType)i);
-        std::string line = "  [" + std::to_string(i+1) + "] "
-                         + Renderer::padRight(info.name, 14)
-                         + " " + std::to_string(cnt) + "/" + std::to_string(MAX_ITEM_STACK)
-                         + "  " + info.effect;
-        std::cout << (cnt == 0 ? "\033[90m" : "") << line << (cnt == 0 ? Renderer::RESET : "") << "\n";
+        itemArts.push_back(&Renderer::getItemArt(i));
+        maxItemArtRows = std::max(maxItemArtRows, (int)itemArts.back()->size());
+        for (const auto& line : *itemArts.back())
+            itemArtWidths[i] = std::max(itemArtWidths[i], Renderer::getDisplayWidth(line));
     }
-    std::cout << "\n  소지금: " << player.getMoney() << "원\n";
-    // 8(rows)+1(─)+2(인벤 헤더)+4(아이템)+2(소지금) = 17줄 사용
+
+    for (int row = 0; row < maxItemArtRows; ++row) {
+        for (int i = 0; i < ITEM_COUNT; ++i) {
+            const auto& art = *itemArts[i];
+            int topPad = (maxItemArtRows - (int)art.size()) / 2;
+            int r = row - topPad;
+            std::string cell;
+            if (r >= 0 && r < (int)art.size()) {
+                int indent = std::max(0, (ITEM_COL - itemArtWidths[i]) / 2);
+                cell = std::string(indent, ' ') + art[r];
+            }
+            std::cout << Renderer::padRight(cell, ITEM_COL);
+        }
+        std::cout << "\n";
+    }
+
+    for (int i = 0; i < ITEM_COUNT; ++i) {
+        int cnt = player.getItemCount((ItemType)i);
+        std::string cell = ITEM_TABLE[i].name + " " + std::to_string(cnt) + "/" + std::to_string(MAX_ITEM_STACK);
+        if (cnt == 0) std::cout << "\033[90m";
+        std::cout << Renderer::center(cell, ITEM_COL);
+        if (cnt == 0) std::cout << Renderer::RESET;
+    }
+    std::cout << "\n";
+
+    for (int i = 0; i < ITEM_COUNT; ++i) {
+        int cnt = player.getItemCount((ItemType)i);
+        if (cnt == 0) std::cout << "\033[90m";
+        std::cout << Renderer::center(ITEM_TABLE[i].effect, ITEM_COL);
+        if (cnt == 0) std::cout << Renderer::RESET;
+    }
+    std::cout << "\n";
+
+    // 1(검위) + maxRows(≤16) + 1(검아래) + 1(sep) + 1(인벤위) + 1(인벤헤더) + 1(인벤아래)
+    // + maxItemArtRows(≤11) + 1(이름) + 1(효과) = maxRows + maxItemArtRows + 8 ≤ 35
+    int usedRows = maxRows + maxItemArtRows + 8;
     if (!lastMsg.empty()) {
-        Renderer::drawMessage(lastMsg);  // 2줄
-        Renderer::fillContent(19);        // 17+2=19 → 26
+        Renderer::drawMessage(lastMsg);
+        Renderer::fillContent(usedRows + 2);
     } else {
-        Renderer::fillContent(17);        // 17 → 26
+        Renderer::fillContent(usedRows);
     }
 
     Renderer::drawBottomMenu({"검 강화", "갑옷 강화", "아이템 구매", "돌아가기"});
@@ -94,38 +189,79 @@ void EquipmentScreen::renderItemShop(const Character& player) {
     Renderer::clearCanvas();
     Renderer::drawTopMenu(player);
 
-    std::cout << "\n";
-    std::cout << "  ┌─────────────────────────────────────────────────────────────────────────────┐\n";
-    std::cout << "  │                          [ 아이템 상점 ]                                    │\n";
-    std::cout << "  │                     종류별 최대 " << MAX_ITEM_STACK << "개 소지 가능                              │\n";
-    std::cout << "  ├──────┬────────────────┬──────┬──────┬────────────────────────────────────────┤\n";
-    std::cout << "  │ 번호 │ 이름           │ 보유 │ 가격 │ 효과                                   │\n";
-    std::cout << "  ├──────┼────────────────┼──────┼──────┼────────────────────────────────────────┤\n";
+    static const int COL_W = 40; // 4 × 40 = 160
 
+    // 헤더 (3행)
+    std::cout << "\n" << Renderer::center("[ 아이템 상점 ]", 161) << "\n\n";
+
+    // 아트 로드 + 최대 높이·너비 계산
+    int maxArtRows = 0;
+    std::vector<const std::vector<std::string>*> arts;
+    std::vector<int> artWidths(ITEM_COUNT, 0);
     for (int i = 0; i < ITEM_COUNT; ++i) {
-        const auto& info = ITEM_TABLE[i];
-        int cnt  = player.getItemCount((ItemType)i);
-        bool max = (cnt >= MAX_ITEM_STACK);
-        std::string row = "  │  [" + std::to_string(i+1) + "] │ "
-                        + Renderer::padRight(info.name, 14) + " │  "
-                        + std::to_string(cnt) + "/" + std::to_string(MAX_ITEM_STACK) + " │ "
-                        + Renderer::padLeft(std::to_string(info.cost), 4) + "원│ "
-                        + Renderer::padRight(info.effect, 38) + "│";
-        if (max)
-            std::cout << "\033[90m" << row << Renderer::RESET << "\n";
-        else
-            std::cout << row << "\n";
+        arts.push_back(&Renderer::getItemArt(i));
+        maxArtRows = std::max(maxArtRows, (int)arts.back()->size());
+        for (const auto& line : *arts.back())
+            artWidths[i] = std::max(artWidths[i], Renderer::getDisplayWidth(line));
     }
-    std::cout << "  └──────┴────────────────┴──────┴──────┴────────────────────────────────────────┘\n";
 
-    std::cout << "\n  소지금: " << player.getMoney() << "원\n";
-    // 1+6+4+1+2 = 14줄 사용
+    // 4열 아트 출력
+    for (int row = 0; row < maxArtRows; ++row) {
+        for (int i = 0; i < ITEM_COUNT; ++i) {
+            const auto& art = *arts[i];
+            int topPad = (maxArtRows - (int)art.size()) / 2;
+            int r = row - topPad;
+            std::string cell;
+            if (r >= 0 && r < (int)art.size()) {
+                int indent = std::max(0, (COL_W - artWidths[i]) / 2);
+                cell = std::string(indent, ' ') + art[r];
+            }
+            std::cout << Renderer::padRight(cell, COL_W);
+        }
+        std::cout << "\n";
+    }
 
+    std::cout << "\n";
+
+    // 이름 행
+    for (int i = 0; i < ITEM_COUNT; ++i) {
+        int cnt = player.getItemCount((ItemType)i);
+        bool full = (cnt >= MAX_ITEM_STACK);
+        if (full) std::cout << "\033[90m";
+        std::cout << Renderer::center(ITEM_TABLE[i].name, COL_W);
+        if (full) std::cout << Renderer::RESET;
+    }
+    std::cout << "\n";
+
+    // 보유/가격 행
+    for (int i = 0; i < ITEM_COUNT; ++i) {
+        int cnt = player.getItemCount((ItemType)i);
+        bool full = (cnt >= MAX_ITEM_STACK);
+        std::string info = std::to_string(cnt) + "/" + std::to_string(MAX_ITEM_STACK)
+                         + "개  " + std::to_string(ITEM_TABLE[i].cost) + "원";
+        if (full) std::cout << "\033[90m";
+        std::cout << Renderer::center(info, COL_W);
+        if (full) std::cout << Renderer::RESET;
+    }
+    std::cout << "\n";
+
+    // 효과 행
+    for (int i = 0; i < ITEM_COUNT; ++i) {
+        int cnt = player.getItemCount((ItemType)i);
+        bool full = (cnt >= MAX_ITEM_STACK);
+        if (full) std::cout << "\033[90m";
+        std::cout << Renderer::center(ITEM_TABLE[i].effect, COL_W);
+        if (full) std::cout << Renderer::RESET;
+    }
+    std::cout << "\n";
+
+    // 1+1+1(헤더) + maxArtRows + 1(blank) + 3(이름/가격/효과) = maxArtRows+7
+    int usedRows = 7 + maxArtRows;
     if (!lastMsg.empty()) {
-        Renderer::drawMessage(lastMsg);  // 2줄
-        Renderer::fillContent(16);        // 14+2=16 → 26
+        Renderer::drawMessage(lastMsg);
+        Renderer::fillContent(usedRows + 2);
     } else {
-        Renderer::fillContent(14);        // 14 → 26
+        Renderer::fillContent(usedRows);
     }
 
     Renderer::drawBottomMenu({"힘의 포션", "민첩의 포션", "밧줄", "방패", "돌아가기"});

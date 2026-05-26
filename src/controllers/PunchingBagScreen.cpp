@@ -3,135 +3,108 @@
 #include "TrainingScreen.h"
 #include "../views/Renderer.h"
 #include <iostream>
-#include <string>
+#include <algorithm>
 
-// ── 캐릭터 ASCII (6행) ─────────────────────────────────────────────
-const char* PunchingBagScreen::CHAR_IDLE[6] = {
-    "   (^_^)  ",
-    "   ( || ) ",
-    "   /|  |  ",
-    "  / |  |  ",
-    "    |  |  ",
-    "   _|  |_ ",
-};
-const char* PunchingBagScreen::CHAR_PUNCH[6] = {
-    "   (>_<)  ",
-    "   ( ||---",
-    "   /|     ",
-    "  / |     ",
-    "    |     ",
-    "   _|__   ",
-};
-
-// ── 샌드백 ASCII 4단계 × 8행 ─────────────────────────────────────
-const char* PunchingBagScreen::BAG_ART[4][8] = {
-    // 0: 온전
-    {
-        "    _______   ",
-        "   |       |  ",
-        "   |       |  ",
-        "   | 샌드백 | ",
-        "   |       |  ",
-        "   |_______|  ",
-        "      | |     ",
-        "      | |     ",
-    },
-    // 1: 균열 (10+)
-    {
-        "    _//_____  ",
-        "   |  //    | ",
-        "   | //균열 | ",
-        "   |// 백   | ",
-        "   |/       | ",
-        "   |_//_____| ",
-        "      | |     ",
-        "      | |     ",
-    },
-    // 2: 파손 (20+)
-    {
-        "    _x___x__  ",
-        "   |x  x   |  ",
-        "   | x 파  |  ",
-        "   |x  손  x| ",
-        "   | x   x |  ",
-        "   |x__x___x| ",
-        "      | |     ",
-        "      | |     ",
-    },
-    // 3: 파괴 (30)
-    {
-        "    * * * *   ",
-        "   * 완전  *  ",
-        "  *  파괴   * ",
-        "   *  !!   *  ",
-        "    * * * *   ",
-        "              ",
-        "              ",
-        "              ",
-    },
-};
+static const int TOTAL_PUNCHES = 10;
 
 PunchingBagScreen::PunchingBagScreen()
     : state(PBState::IDLE), punchCount(0), punchAnim(false) {}
-
-int PunchingBagScreen::bagStage() const {
-    if (punchCount >= 30) return 3;
-    if (punchCount >= 20) return 2;
-    if (punchCount >= 10) return 1;
-    return 0;
-}
 
 // ══════════════════════════════════════════════════════════════════
 //  render
 // ══════════════════════════════════════════════════════════════════
 
 void PunchingBagScreen::render(const Character& player) {
-    Renderer::clearCanvas();
-    Renderer::drawTopMenu(player);
-
-    // 애니메이션 만료 확인 (300ms)
     if (punchAnim) {
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - punchTime).count();
         if (ms >= 300) punchAnim = false;
     }
 
-    const char** charArt = punchAnim ? CHAR_PUNCH : CHAR_IDLE;
-    int stage = bagStage();
+    Renderer::clearCanvas();
+    Renderer::drawTopMenu(player);
 
-    std::cout << "\n";
-    std::cout << "  [ 샌드백 치기 ]    진행: " << punchCount << " / 30\n";
-    std::cout << "  ";
-    for (int i = 0; i < 30; ++i)
-        std::cout << (i < punchCount ? "█" : "░");
-    std::cout << "\n";
-    std::cout << "------------------------------------------------------------------------------------------------------------------------\n\n";
+    // ── 레이아웃: left(65) │ center(29) │ right(65) = 161 ───────────
+    static const int LEFT_W   = 65;
+    static const int CENTER_W = 29;
+    static const int RIGHT_W  = 65;
 
-    // 좌측: 캐릭터(40컬럼), 우측: 샌드백(40컬럼)
-    int rows = 8;
-    for (int r = 0; r < rows; ++r) {
-        std::string charLine = (r < 6) ? charArt[r] : "          ";
-        std::string bagLine  = BAG_ART[stage][r];
+    const auto& playerArt = Renderer::getPlayerArt();
+    const auto& bagArt    = Renderer::getPunchingBagArt();
 
-        std::cout << "          "
-                  << Renderer::padRight(charLine, 35)
-                  << "     "
-                  << bagLine << "\n";
+    int pRows   = (int)playerArt.size();
+    int bRows   = (int)bagArt.size();
+    int artRows = std::max(pRows, bRows);
+
+    // 수직 중앙 정렬 오프셋
+    int pTop = (artRows - pRows) / 2;
+    int bTop = (artRows - bRows) / 2;
+
+    // 아트 수평 너비 → 열 안에서 중앙 정렬
+    int pArtW = 0, bArtW = 0;
+    for (const auto& l : playerArt) pArtW = std::max(pArtW, Renderer::getDisplayWidth(l));
+    for (const auto& l : bagArt)    bArtW = std::max(bArtW, Renderer::getDisplayWidth(l));
+    int pIndent = std::max(0, (LEFT_W  - pArtW) / 2);
+    int bIndent = std::max(0, (RIGHT_W - bArtW) / 2);
+
+    // ── 중앙 컬럼 내용 빌드 ─────────────────────────────────────────
+    std::vector<std::string> centerCol(artRows, "");
+
+    int remaining = TOTAL_PUNCHES - punchCount;
+
+    // 상단: 남은 펀치 횟수
+    centerCol[2] = Renderer::center("[ 남은 펀치 ]", CENTER_W);
+    centerCol[4] = Renderer::center(std::to_string(remaining) + "번 남음", CENTER_W);
+
+    // 진행 바
+    std::string bar = "[";
+    for (int i = 0; i < TOTAL_PUNCHES; ++i)
+        bar += (i < punchCount ? "█" : "░");
+    bar += "]";
+    centerCol[6] = Renderer::center(bar, CENTER_W);
+
+    // 하단: 펀치 피드백
+    if (punchAnim) {
+        centerCol[10] = Renderer::center("퍽!", CENTER_W);
+        centerCol[11] = Renderer::center("(" + std::to_string(punchCount) + "/" +
+                                         std::to_string(TOTAL_PUNCHES) + ")", CENTER_W);
     }
 
-    std::cout << "\n";
-    // 공통: 1+1+1+2+8+1 = 14줄 사용
+    // ── 3열 출력 (상단 여백 2줄) ─────────────────────────────────────
+    std::cout << "\n\n";
+    for (int row = 0; row < artRows; ++row) {
+        // 좌: 플레이어
+        {
+            int r = row - pTop;
+            std::string cell;
+            if (r >= 0 && r < pRows)
+                cell = std::string(pIndent, ' ') + playerArt[r];
+            std::cout << Renderer::padRight(cell, LEFT_W);
+        }
+        // 중: 정보
+        std::cout << "│" << Renderer::padRight(centerCol[row], CENTER_W) << "│";
+        // 우: 샌드백
+        {
+            int r = row - bTop;
+            std::string cell;
+            if (r >= 0 && r < bRows)
+                cell = std::string(bIndent, ' ') + bagArt[r];
+            std::cout << Renderer::padRight(cell, RIGHT_W);
+        }
+        std::cout << "\n";
+    }
+
+    // 2(pad) + artRows 행 사용
+    int usedRows = 2 + artRows;
+
     if (state == PBState::DONE) {
-        std::cout << Renderer::GREEN << "  샌드백을 완전히 부쉈습니다! 공격력 +5 상승!\n" << Renderer::RESET;
-        std::cout << "  아무 키나 눌러 훈련 종료\n";
-        Renderer::fillContent(16); // 14+2=16 → 26
+        std::cout << "\n" << Renderer::GREEN
+                  << Renderer::center("훈련 완료!  공격력 +8", 161)
+                  << Renderer::RESET << "\n";
+        Renderer::fillContent(usedRows + 2);
         Renderer::drawBottomMenu({"훈련 완료 (클릭)"});
     } else {
-        if (punchAnim)
-            std::cout << Renderer::YELLOW << "  펀치! (" << punchCount << "/30)\n" << Renderer::RESET;
-        else
-            std::cout << "  \"펀치\" 버튼을 30번 눌러 샌드백을 부수세요!\n";
-        Renderer::fillContent(15); // 14+1=15 → 26
+        Renderer::fillContent(usedRows);
         Renderer::drawBottomMenu({"펀치", "돌아가기"});
     }
 }
@@ -143,30 +116,21 @@ void PunchingBagScreen::render(const Character& player) {
 void PunchingBagScreen::handleInput(GameEngine& engine, Character& player, const InputEvent& event) {
     if (state == PBState::DONE) {
         if (event.type == InputType::MOUSE_PRESS) {
-            player.trainAttack(5);
+            player.trainAttack(8);
             engine.changeScreen(std::make_unique<TrainingScreen>());
         }
         return;
     }
 
-    int choice = -1;
-    if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 31) {
-            int btnW = 158 / 2;
-            int btn  = (event.x - 1) / btnW;
-            if (btn == 0) choice = 1; // 펀치
-            else          choice = 0; // 돌아가기
+    if (event.type == InputType::MOUSE_PRESS && event.button == 0 && event.y >= 41) {
+        int btn = (event.x - 1) / (158 / 2);
+        if (btn == 0) { // 펀치
+            ++punchCount;
+            punchAnim = true;
+            punchTime = std::chrono::steady_clock::now();
+            if (punchCount >= TOTAL_PUNCHES) state = PBState::DONE;
+        } else { // 돌아가기
+            engine.changeScreen(std::make_unique<TrainingScreen>());
         }
-    }
-
-    if (choice == 1) {
-        ++punchCount;
-        punchAnim = true;
-        punchTime = std::chrono::steady_clock::now();
-        if (punchCount >= 30) {
-            state = PBState::DONE;
-        }
-    } else if (choice == 0) {
-        engine.changeScreen(std::make_unique<TrainingScreen>());
     }
 }

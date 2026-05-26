@@ -1,5 +1,6 @@
 #include "GameEngine.h"
 #include "MainScreen.h"
+#include "EndingScreen.h"
 #include "../views/Renderer.h"
 #include <iostream>
 #include <cstdlib>
@@ -14,21 +15,28 @@ void GameEngine::run() {
     currentScreen->render(player);
     InputEvent lastEvent;
     while (running) {
-        InputEvent event = inputHandler.pollEvent();
-        if (event.type != InputType::NONE) {
+        InputEvent event = inputHandler.pollEvent(); // 100ms 타임아웃
+        bool hasInput = (event.type != InputType::NONE);
+
+        if (hasInput) {
             lastEvent = event;
             currentScreen->handleInput(*this, player, event);
-            
+
             if (player.isEndingCondition()) {
-                std::cout << "게임 오버! 다마고치가 살기 힘든 환경이 되었습니다." << std::endl;
-                running = false;
-                break;
-            }
-            
-            if (running) {
+                EndingType et;
+                if      (player.getHunger()       <= 0) et = EndingType::STARVE;
+                else if (player.getHappiness()    <= 0) et = EndingType::RUNAWAY;
+                else if (player.getCleanliness()  <= 0) et = EndingType::TRASH;
+                else                                    et = EndingType::HOSPITAL;
+                currentScreen = std::make_unique<EndingScreen>(et);
                 currentScreen->render(player);
-                Renderer::drawDebug(lastEvent);
             }
+        }
+
+        // 입력이 있거나, 화면이 재렌더를 요청할 때만 렌더 (번쩍임 방지)
+        if (running && (hasInput || currentScreen->needsRedraw())) {
+            currentScreen->render(player);
+            if (hasInput) Renderer::drawDebug(lastEvent);
         }
     }
 }

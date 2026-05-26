@@ -11,11 +11,11 @@ void Monster::takeDamage(int damage) {
 Monster Monster::generateStageMonster(int stage) {
     Monster m("슬라임", 10, 1);
     switch(stage) {
-        case 1: m = Monster("꼬마 공룡", 1000, 100); m.evasion = 10; break;
-        case 2: m = Monster("뿔 공룡", 2000, 200); m.evasion = 20; break;
-        case 3: m = Monster("날개 공룡", 3000, 300); m.evasion = 30; break;
-        case 4: m = Monster("목 긴 공룡", 4000, 400); m.evasion = 40; break;
-        case 5: m = Monster("티라노사우르스", 5000, 500); m.evasion = 50; break;
+        case 1: m = Monster("네시",            80,   15); m.evasion = 5;  break;
+        case 2: m = Monster("파라사우롤로푸스", 180,  28); m.evasion = 10; break;
+        case 3: m = Monster("트리케라톱스",    300,  45); m.evasion = 15; break;
+        case 4: m = Monster("프테라노돈",      450,  65); m.evasion = 20; break;
+        case 5: m = Monster("티라노사우루스",  650,  90); m.evasion = 25; break;
     }
 
     static const std::string art1 = R"ART(⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀공격　모션⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀　⠀⠀⠀⠀
@@ -157,5 +157,6 @@ Monster Monster::generateStageMonster(int stage) {
         case 4: m.ascii = art4; break;
         case 5: m.ascii = art5; break;
     }
+    m.stageNum = stage;
     return m;
 }

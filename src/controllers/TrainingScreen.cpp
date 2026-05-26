@@ -11,14 +11,13 @@ void TrainingScreen::render(const Character& player) {
     Renderer::clearCanvas();
     Renderer::drawTopMenu(player);
 
-    std::cout << "\n";
-    Renderer::drawMainCharacter();
+    Renderer::drawMainCharacter();   // 2+32+2 = 36행 = CONTENT_H
 
     if (!lastAction.empty()) {
         Renderer::drawMessage(lastAction);  // 2줄 (\n + >> msg\n)
-        Renderer::fillContent(23);           // 1+20+2=23 → 26까지 패딩
+        Renderer::fillContent(38);           // 36+2=38 (fillContent가 음수면 0줄 추가)
     } else {
-        Renderer::fillContent(21);           // 1+20=21 → 26까지 패딩
+        Renderer::fillContent(36);           // 36행 사용 → 패딩 없음
     }
 
     Renderer::drawBottomMenu({"샌드백치기", "달리기", "반응속도", "돌아가기"});
@@ -28,7 +27,7 @@ void TrainingScreen::handleInput(GameEngine& engine, Character& player, const In
     int choice = -1;
 
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 31) {
+        if (event.y >= 41) {
             int btnW = 158 / 4;
             int btn  = (event.x - 1) / btnW;
             if (btn == 0) choice = 1;

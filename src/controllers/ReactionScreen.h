@@ -18,6 +18,7 @@ public:
     ReactionScreen();
     void render(const Character& player) override;
     void handleInput(GameEngine& engine, Character& player, const InputEvent& event) override;
+    bool needsRedraw() const override { return state != RCState::RESULT; }
 
 private:
     RCState   state;

@@ -59,6 +59,7 @@ public:
     // ── 전투 ───────────────────────────────────────────────────
     void takeDamage(int rawDamage); // 갑옷 감소 적용 후 HP 차감
     void restoreHp();               // 배틀 후 HP 전회복
+    void afterBattle();             // 배틀 후 육성 스탯 감소
     bool isAlive()               const { return hp > 0; }
     bool isEndingCondition()     const;
     void clearStage(int stage);     // clearedStage 갱신

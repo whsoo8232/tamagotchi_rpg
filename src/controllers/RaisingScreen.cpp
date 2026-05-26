@@ -16,14 +16,14 @@ void RaisingScreen::render(const Character& player) {
             animating = false;
     }
 
-    // 행동별 애니메이션 아트
-    if      (animating && animType == 1) Renderer::drawEatingCharacter();
-    else if (animating && animType == 2) Renderer::drawBathCharacter();
-    else if (animating && animType == 3) Renderer::drawPlayCharacter();
-    else if (animating && animType == 4) Renderer::drawTreatCharacter();
-    else                                 Renderer::drawMainCharacter();
+    // 각 아트 함수가 내부적으로 36행(= CONTENT_H)을 출력
+    if      (animating && animType == 1) Renderer::drawEatingCharacter(); // 3+30+3=36
+    else if (animating && animType == 2) Renderer::drawBathCharacter();   // 4+28+4=36
+    else if (animating && animType == 3) Renderer::drawPlayCharacter();   // 7+22+7=36
+    else if (animating && animType == 4) Renderer::drawTreatCharacter();  // 3+30+3=36
+    else                                 Renderer::drawMainCharacter();    // 2+32+2=36
 
-    Renderer::fillContent(20); // art=20 → CONTENT_H=26까지 패딩
+    Renderer::fillContent(36); // 36행 사용 → 패딩 없음
 
     Renderer::drawBottomMenu({"밥주기", "목욕하기", "놀아주기", "치료하기", "돌아가기"});
 }
@@ -32,7 +32,7 @@ void RaisingScreen::handleInput(GameEngine& engine, Character& player, const Inp
     int choice = -1;
 
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 31) {
+        if (event.y >= 41) {
             int btnW = 158 / 5;
             int btn  = (event.x - 1) / btnW;
             if (btn == 0) choice = 1;
