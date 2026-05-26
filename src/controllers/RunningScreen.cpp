@@ -64,15 +64,16 @@ void RunningScreen::render(const Character& player) {
     std::cout << "  |" << "S" << std::string(TRACK_WIDTH - 2, ' ') << "G|\n\n\n";
     std::cout << "  S=출발  G=결승선\n\n";
 
+    // 공통: 1+1+1+3+1+1+3+2 = 13줄 사용
     if (state == RNState::DONE) {
         std::cout << Renderer::GREEN
                   << "  결승선 통과! 체력(HP) +10 상승!\n" << Renderer::RESET;
         std::cout << "  아무 키나 눌러 훈련 종료\n";
-        for (int i = 0; i < 8; ++i) std::cout << "\n";
+        Renderer::fillContent(15); // 13+2=15 → 26
         Renderer::drawBottomMenu({"훈련 완료 (클릭)"});
     } else {
         std::cout << "  \"달리기\" 버튼을 " << TOTAL_STEPS << "번 눌러 결승선에 도착하세요!\n";
-        for (int i = 0; i < 9; ++i) std::cout << "\n";
+        Renderer::fillContent(14); // 13+1=14 → 26
         Renderer::drawBottomMenu({"달리기", "돌아가기"});
     }
 }
@@ -92,8 +93,8 @@ void RunningScreen::handleInput(GameEngine& engine, Character& player, const Inp
 
     int choice = -1;
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 30) {
-            int btnW = 118 / 2;
+        if (event.y >= 31) {
+            int btnW = 158 / 2;
             int btn  = (event.x - 1) / btnW;
             if (btn == 0) choice = 1; // 달리기
             else          choice = 0; // 돌아가기

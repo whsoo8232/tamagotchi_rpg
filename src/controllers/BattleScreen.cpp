@@ -5,7 +5,6 @@
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
-#include <ctime>
 #include <algorithm>
 
 BattleScreen::BattleScreen()
@@ -13,7 +12,6 @@ BattleScreen::BattleScreen()
       enemy(Monster::generateStageMonster(1)),
       selectedStage(1), selectedItemIdx(-1),
       battleLog(""), turnResult(""), turnCount(0) {
-    std::srand(static_cast<unsigned>(std::time(nullptr)));
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -39,8 +37,12 @@ void BattleScreen::renderStageSelect(const Character& player) {
     Renderer::clearCanvas();
     Renderer::drawTopMenu(player);
 
+    // 아트 표시 행 수: CONTENT_H(26) - 2행(로그여유) = 24
+    // art1=25행→1크롭, art2=20행✓, art3/5=24행✓, art4=22행✓
+    static const int ROWS = 24;
+
     // ── 좌측(26): 스테이지 목록 ────────────────────────────────
-    std::vector<std::string> leftCol(22, "");
+    std::vector<std::string> leftCol(ROWS, "");
     leftCol[0] = " [ 스테이지 선택 ]";
     int cleared = player.getClearedStage();
     for (int i = 1; i <= 5; ++i) {
@@ -51,38 +53,76 @@ void BattleScreen::renderStageSelect(const Character& player) {
         leftCol[2 + (i - 1) * 2] = label;
     }
 
-    // ── 중앙(64): 몬스터 ASCII 아트 ────────────────────────────
+    // ── 중앙(64): 몬스터 아트 (빈 줄 트리밍 + 중앙 크롭) ────────
     std::vector<std::string> artLines;
     {
         std::stringstream ss(enemy.getAscii());
         std::string line;
         while (std::getline(ss, line)) artLines.push_back(line);
     }
-    int artH   = (int)artLines.size();
-    int artTop = std::max(0, (22 - artH) / 2);
+
+    // 빈 줄 판별: ⠀(U+2800), 공백, 　(U+3000) 만 있으면 빈 줄
+    auto isBlank = [](const std::string& line) -> bool {
+        for (size_t i = 0; i < line.size(); ) {
+            unsigned char c = (unsigned char)line[i];
+            if (c == 0x20) { ++i; continue; }
+            if (c == 0xE2 && i+2 < line.size() &&
+                (unsigned char)line[i+1] == 0xA0 &&
+                (unsigned char)line[i+2] == 0x80) { i += 3; continue; } // ⠀
+            if (c == 0xE3 && i+2 < line.size() &&
+                (unsigned char)line[i+1] == 0x80 &&
+                (unsigned char)line[i+2] == 0x80) { i += 3; continue; } //
+            return false;
+        }
+        return true;
+    };
+
+    // 레이블(line0) 스킵 + 앞뒤 빈 줄 트리밍
+    int mFirst = artLines.empty() ? 0 : 1;
+    while (mFirst < (int)artLines.size() && isBlank(artLines[mFirst])) ++mFirst;
+    int mLast = (int)artLines.size() - 1;
+    while (mLast > mFirst && isBlank(artLines[mLast])) --mLast;
+    int mCount = (mFirst <= mLast) ? (mLast - mFirst + 1) : 0;
+
+    // ROWS 초과 시 중앙 크롭
+    if (mCount > ROWS) {
+        mFirst += (mCount - ROWS) / 2;
+        mCount  = ROWS;
+    }
+
+    // 너비 계산 (트리밍된 범위에서)
     int maxArtW = 0;
-    for (const auto& l : artLines) maxArtW = std::max(maxArtW, Renderer::getDisplayWidth(l));
+    for (int i = mFirst; i < mFirst + mCount; ++i)
+        maxArtW = std::max(maxArtW, Renderer::getDisplayWidth(artLines[i]));
     int artPad = std::max(0, (64 - maxArtW) / 2);
-    std::vector<std::string> centerCol(22, "");
-    for (int i = 0; i < artH && (artTop + i) < 22; ++i)
-        centerCol[artTop + i] = std::string(artPad, ' ') + artLines[i];
+
+    // 수직 중앙 정렬
+    int artTop = (ROWS - mCount) / 2;
+    std::vector<std::string> centerCol(ROWS, "");
+    for (int i = 0; i < mCount; ++i)
+        centerCol[artTop + i] = std::string(artPad, ' ') + artLines[mFirst + i];
 
     // ── 우측(28): 몬스터 정보 ──────────────────────────────────
-    std::vector<std::string> rightCol(22, "");
+    std::vector<std::string> rightCol(ROWS, "");
     rightCol[0] = " [ 몬스터 정보 ]";
     rightCol[2] = " 이름   : " + enemy.getName();
     rightCol[3] = " HP     : " + std::to_string(enemy.getHp());
     rightCol[4] = " 공격력 : " + std::to_string(enemy.getAttack());
     rightCol[5] = " 회피율 : " + std::to_string(enemy.getEvasion()) + "%";
 
-    for (int i = 0; i < 22; ++i) {
+    for (int i = 0; i < ROWS; ++i) {
         std::cout << Renderer::padRight(leftCol[i], 26) << "│";
         std::cout << Renderer::padRight(centerCol[i], 64) << "│";
         std::cout << rightCol[i] << "\n";
     }
 
-    if (!battleLog.empty()) Renderer::drawMessage(battleLog);
-    else std::cout << "\n\n";
+    // ROWS=24: 배틀로그 있으면 24+2=26=CONTENT_H, 없으면 24→26(2행 패딩)
+    if (!battleLog.empty()) {
+        Renderer::drawMessage(battleLog);
+        Renderer::fillContent(ROWS + 2);
+    } else {
+        Renderer::fillContent(ROWS);
+    }
 
     Renderer::drawBottomMenu({"전투 시작", "돌아가기"});
 }
@@ -120,7 +160,7 @@ void BattleScreen::renderItemSelect(const Character& player) {
     std::cout << "  │   [0] 아이템 사용 안함                                                     │\n";
     std::cout << "  └─────────────────────────────────────────────────────────────────────────────┘\n";
 
-    for (int i = 0; i < 6; ++i) std::cout << "\n";
+    Renderer::fillContent(16); // 1+4+8+3=16 → 26
 
     Renderer::drawBottomMenu({"힘의 포션", "민첩의 포션", "밧줄", "방패", "사용 안함"});
 }
@@ -129,45 +169,64 @@ void BattleScreen::renderCombatMain(const Character& player) {
     Renderer::clearCanvas();
     Renderer::drawTopMenu(player);
 
-    std::cout << "\n";
-    std::cout << "  ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐\n";
+    // ── 몬스터 아트 파싱 ───────────────────────────────────────────
+    std::vector<std::string> monsterLines;
+    {
+        std::stringstream ss(enemy.getAscii());
+        std::string line;
+        while (std::getline(ss, line)) monsterLines.push_back(line);
+    }
 
-    // HP 바
-    auto hpBar = [](int cur, int max) -> std::string {
+    // ── HP 바 출력 헬퍼 (컬러 포함, 시각 너비 22 고정) ─────────────
+    // ※ █/░ 는 터미널에서 1col이지만 getDisplayWidth는 2col로 계산하므로
+    //   여백 계산은 수동으로 처리
+    auto printHpBar = [&](int cur, int max) {
         int blocks = (max > 0) ? (cur * 20 / max) : 0;
-        std::string s = "[";
+        int pct    = (max > 0) ? (cur * 100 / max) : 0;
+        const std::string& col = (pct > 50) ? Renderer::GREEN
+                                : (pct > 20) ? Renderer::YELLOW
+                                :               Renderer::RED;
+        std::cout << col << "[";
         for (int i = 0; i < 20; ++i)
-            s += (i < blocks) ? "█" : "░";
-        s += "] " + std::to_string(cur) + "/" + std::to_string(max);
-        return s;
+            std::cout << (i < blocks ? "█" : "░");
+        std::cout << "]" << Renderer::RESET;
     };
 
-    std::cout << "  │  " << Renderer::padRight(player.getName(), 12)
-              << " HP: " << hpBar(player.getHp(), player.getMaxHp())
-              << Renderer::padRight("", 30) << "│\n";
-    std::cout << "  │  " << Renderer::padRight(enemy.getName(), 12)
-              << " HP: " << hpBar(enemy.getHp(), enemy.getHp() + 1)
-              << Renderer::padRight("", 30) << "│\n";
+    // ── 렌더링 시작 ────────────────────────────────────────────────
+    // 레이아웃: HP바(1) + 아트(24) + 턴정보(1) = 26 = CONTENT_H
+    // 분리선을 없애 아트 영역을 최대화
 
-    std::cout << "  ├─────────────────────────────────────────────────────────────────────────────────────────────────┤\n";
-    std::cout << "  │  턴 " << turnCount;
+    // 1: HP 바 행 (좌 70col │ 우)
+    // 좌측 시각 너비: 2 + 12(name) + 5(" HP: ") + 22([bar]) + pHpTxt
+    std::string pHpTxt = " " + std::to_string(player.getHp())
+                       + "/" + std::to_string(player.getMaxHp());
+    std::cout << "  " << Renderer::padRight(player.getName(), 12) << " HP: ";
+    printHpBar(player.getHp(), player.getMaxHp());
+    std::cout << pHpTxt;
+    int leftUsed = 2 + 12 + 5 + 22 + (int)pHpTxt.size();
+    std::cout << std::string(std::max(0, 70 - leftUsed), ' ') << "│";
+    // 우측
+    std::string mHpTxt = " " + std::to_string(enemy.getHp())
+                       + "/" + std::to_string(enemy.getMaxHp());
+    std::cout << "  " << Renderer::padRight(enemy.getName(), 14) << " HP: ";
+    printHpBar(enemy.getHp(), enemy.getMaxHp());
+    std::cout << mHpTxt << "\n"; // 1
 
+    Renderer::drawCombatLayout(monsterLines); // 2-25: 24행 대치 아트
+
+    // 26: 턴 정보
+    std::cout << "  턴 " << turnCount;
     if (selectedItemIdx >= 0) {
-        std::cout << "   ✦ 선택된 아이템: "
-                  << Renderer::YELLOW << ITEM_TABLE[selectedItemIdx].name << Renderer::RESET;
+        std::cout << "   " << Renderer::YELLOW
+                  << "✦ 아이템: " << ITEM_TABLE[selectedItemIdx].name
+                  << Renderer::RESET;
     } else {
         std::cout << "   아이템: 없음";
     }
-    std::cout << Renderer::padRight("", 50) << "│\n";
+    std::cout << "\n"; // 26
 
-    std::cout << "  │  [4] 아이템 선택  [0] 도망치기"
-              << Renderer::padRight("", 65) << "│\n";
-    std::cout << "  └─────────────────────────────────────────────────────────────────────────────────────────────────┘\n";
-
-    for (int i = 0; i < 14; ++i) std::cout << "\n";
-
-    if (!battleLog.empty()) Renderer::drawMessage(battleLog);
-    else std::cout << "\n";
+    // 합계: 1 + 24 + 1 = 26 = CONTENT_H (빈 줄 추가 불필요)
+    Renderer::fillContent(26);
 
     Renderer::drawBottomMenu({"가위", "바위", "보", "아이템", "도망"});
 }
@@ -179,7 +238,7 @@ void BattleScreen::renderCombatResult(const Character& player) {
     std::cout << "\n";
     for (int i = 0; i < 10; ++i) std::cout << "\n";
     std::cout << "  " << turnResult << "\n";
-    for (int i = 0; i < 10; ++i) std::cout << "\n";
+    Renderer::fillContent(12); // 1+10+1=12 → 26
 
     Renderer::drawBottomMenu({"계속"});
 }
@@ -197,7 +256,7 @@ void BattleScreen::renderBattleWin(const Character& player) {
     std::cout << "  ║  " << Renderer::padRight("획득 금액: " + std::to_string(reward) + "원", 36) << "║\n";
     std::cout << "  ║  " << Renderer::padRight("클리어 스테이지: " + std::to_string(selectedStage), 36) << "║\n";
     std::cout << "  ╚══════════════════════════════════════╝\n";
-    for (int i = 0; i < 14; ++i) std::cout << "\n";
+    Renderer::fillContent(12); // 5+7=12 → 26
 
     Renderer::drawBottomMenu({"계속"});
 }
@@ -213,7 +272,7 @@ void BattleScreen::renderBattleLose(const Character& player) {
     std::cout << "  ║  " << Renderer::padRight(player.getName() + " 이(가) 쓰러졌습니다.", 36) << "║\n";
     std::cout << "  ║  " << Renderer::padRight("훈련을 더 해보세요!", 36) << "║\n";
     std::cout << "  ╚══════════════════════════════════════╝\n";
-    for (int i = 0; i < 14; ++i) std::cout << "\n";
+    Renderer::fillContent(11); // 5+6=11 → 26
 
     Renderer::drawBottomMenu({"돌아가기"});
 }
@@ -240,8 +299,8 @@ void BattleScreen::handleInput(GameEngine& engine, Character& player, const Inpu
 void BattleScreen::handleStageSelect(GameEngine& engine, Character& player, const InputEvent& event) {
     int choice = -1;
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 30) {
-            int btnW = 118 / 2;
+        if (event.y >= 31) {
+            int btnW = 158 / 2;
             int btn  = (event.x - 1) / btnW;
             if (btn == 0) choice = 1;
             else          choice = 0;
@@ -273,8 +332,8 @@ void BattleScreen::handleStageSelect(GameEngine& engine, Character& player, cons
 void BattleScreen::handleItemSelect(GameEngine& engine, Character& player, const InputEvent& event) {
     int choice = -1;
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 30) {
-            int btnW = 118 / 5;
+        if (event.y >= 31) {
+            int btnW = 158 / 5;
             int btn  = (event.x - 1) / btnW;
             if (btn >= 0 && btn < 4) choice = btn;
             else                     choice = ITEM_COUNT;
@@ -297,8 +356,8 @@ void BattleScreen::handleItemSelect(GameEngine& engine, Character& player, const
 void BattleScreen::handleCombatMain(GameEngine& engine, Character& player, const InputEvent& event) {
     int choice = -1;
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 30) {
-            int btnW = 118 / 5;
+        if (event.y >= 31) {
+            int btnW = 158 / 5;
             int btn  = (event.x - 1) / btnW + 1; // 1-indexed
             if (btn >= 1 && btn <= 3)       choice = btn;
             else if (btn == 4) { state = BattleState::ITEM_SELECT; return; }

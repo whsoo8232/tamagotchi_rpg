@@ -43,6 +43,12 @@ private:
     struct termios orig_termios;
     void enableRawMode();
     void disableRawMode();
+
+    // ── 시그널 처리 ────────────────────────────────────────────
+    // Ctrl+C / kill 등 비정상 종료 시에도 터미널 상태를 복원하기 위해
+    // 정적 인스턴스 포인터와 시그널 핸들러를 사용한다.
+    static InputHandler* s_instance;
+    static void signalHandler(int sig);
 };
 
 #endif

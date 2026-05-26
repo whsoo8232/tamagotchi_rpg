@@ -10,7 +10,6 @@ public:
     void render(const Character& player) override;
     void handleInput(GameEngine& engine, Character& player, const InputEvent& event) override;
 private:
-    std::string lastAction;
     bool animating = false;
     int animType = 0;
     std::chrono::steady_clock::time_point animStart;

@@ -1,14 +1,45 @@
 #include "InputHandler.h"
 #include <iostream>
 #include <unistd.h>
+#include <csignal>
+#include <cstring>
 #include <vector>
 
+// ── 정적 멤버 초기화 ────────────────────────────────────────────────
+InputHandler* InputHandler::s_instance = nullptr;
+
+// ── 시그널 핸들러 ───────────────────────────────────────────────────
+// async-signal-safe 함수만 사용: write(), tcsetattr(), _exit()
+// std::cout, exit() 등은 시그널 핸들러에서 사용하면 안 됨
+void InputHandler::signalHandler(int /*sig*/) {
+    // 마우스 트래킹 비활성화 (SGR + X10)
+    const char* disableMouse = "\033[?1006l\033[?1000l";
+    write(STDOUT_FILENO, disableMouse, strlen(disableMouse));
+
+    // raw 모드 → 원래 termios 복원
+    if (s_instance) {
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &s_instance->orig_termios);
+    }
+
+    _exit(0); // 소멸자 호출 없이 즉시 종료 (시그널 핸들러에서 안전)
+}
+
+// ── 생성자 / 소멸자 ─────────────────────────────────────────────────
+
 InputHandler::InputHandler() {
+    s_instance = this;
+    // Ctrl+C (SIGINT) 와 kill (SIGTERM) 모두 처리
+    signal(SIGINT,  signalHandler);
+    signal(SIGTERM, signalHandler);
     enableRawMode();
     enableMouseTracking();
 }
 
 InputHandler::~InputHandler() {
+    // 정상 종료 시: 핸들러 원복 후 터미널 복원
+    s_instance = nullptr;
+    signal(SIGINT,  SIG_DFL);
+    signal(SIGTERM, SIG_DFL);
     disableMouseTracking();
     disableRawMode();
 }

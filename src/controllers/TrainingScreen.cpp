@@ -11,13 +11,14 @@ void TrainingScreen::render(const Character& player) {
     Renderer::clearCanvas();
     Renderer::drawTopMenu(player);
 
-    std::cout << std::endl;
+    std::cout << "\n";
     Renderer::drawMainCharacter();
 
     if (!lastAction.empty()) {
-        Renderer::drawMessage(lastAction);
+        Renderer::drawMessage(lastAction);  // 2줄 (\n + >> msg\n)
+        Renderer::fillContent(23);           // 1+20+2=23 → 26까지 패딩
     } else {
-        std::cout << "\n\n";
+        Renderer::fillContent(21);           // 1+20=21 → 26까지 패딩
     }
 
     Renderer::drawBottomMenu({"샌드백치기", "달리기", "반응속도", "돌아가기"});
@@ -27,8 +28,8 @@ void TrainingScreen::handleInput(GameEngine& engine, Character& player, const In
     int choice = -1;
 
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 30) {
-            int btnW = 118 / 4;
+        if (event.y >= 31) {
+            int btnW = 158 / 4;
             int btn  = (event.x - 1) / btnW;
             if (btn == 0) choice = 1;
             else if (btn == 1) choice = 2;

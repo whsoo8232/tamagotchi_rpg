@@ -4,11 +4,9 @@
 #include "../views/Renderer.h"
 #include <iostream>
 #include <cstdlib>
-#include <ctime>
 
 ReactionScreen::ReactionScreen()
     : state(RCState::INTRO), waitMs(0), reactionMs(-1), agiGain(0) {
-    std::srand(static_cast<unsigned>(std::time(nullptr)));
     stateEntered = std::chrono::steady_clock::now();
 }
 
@@ -102,12 +100,19 @@ void ReactionScreen::render(const Character& player) {
         std::cout << "\n  아무 키나 눌러 훈련 종료\n";
     }
 
-    for (int i = 0; i < 8; ++i) std::cout << "\n";
-
-    if (state == RCState::RESULT)
+    if (state == RCState::RESULT) {
+        // 6(공통) + 0(버블없음) + 4(캐릭터) + 4(성공) or 3(실패) = 14 or 13
+        Renderer::fillContent(agiGain > 0 ? 14 : 13);
         Renderer::drawBottomMenu({"훈련 종료 (아무 키)"});
-    else
+    } else if (state == RCState::INTRO) {
+        // 6(공통) + 4(버블) + 4(캐릭터) + 2(상태) = 16
+        Renderer::fillContent(16);
         Renderer::drawBottomMenu({"지금! (스페이스)", "돌아가기 (q)"});
+    } else {
+        // WAITING/SIGNAL/JUDGED: 6+4+4+1 = 15
+        Renderer::fillContent(15);
+        Renderer::drawBottomMenu({"지금! (스페이스)", "돌아가기 (q)"});
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -137,7 +142,7 @@ void ReactionScreen::handleInput(GameEngine& engine, Character& player, const In
         }
         // 돌아가기 버튼 클릭
         if (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
-            event.y >= 30 && event.x > 59) {
+            event.y >= 31 && event.x > 80) {
             engine.changeScreen(std::make_unique<TrainingScreen>());
         }
         return;
@@ -146,9 +151,9 @@ void ReactionScreen::handleInput(GameEngine& engine, Character& player, const In
     // WAITING: 대기 시간 경과 → SIGNAL / 조기 클릭 → 실패
     if (state == RCState::WAITING) {
         bool earlyClick = (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
-                           event.y >= 30 && event.x <= 59); // "지금!" 버튼 영역
+                           event.y >= 31 && event.x <= 80); // "지금!" 버튼 영역
         bool backClick  = (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
-                           event.y >= 30 && event.x > 59);
+                           event.y >= 31 && event.x > 80);
 
         if (backClick) {
             engine.changeScreen(std::make_unique<TrainingScreen>());
@@ -173,7 +178,7 @@ void ReactionScreen::handleInput(GameEngine& engine, Character& player, const In
         long long se = signalElapsed();
 
         bool pressed = (event.type == InputType::MOUSE_PRESS && event.button == 0 &&
-                        event.y >= 30 && event.x <= 59);
+                        event.y >= 31 && event.x <= 80);
 
         if (pressed) {
             reactionMs = se;

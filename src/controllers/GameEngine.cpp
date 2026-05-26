@@ -2,8 +2,11 @@
 #include "MainScreen.h"
 #include "../views/Renderer.h"
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 
 GameEngine::GameEngine() : running(true), player("다마고치") {
+    std::srand(static_cast<unsigned>(std::time(nullptr))); // 난수 시드 단 한 번만 초기화
     currentScreen = std::make_unique<MainScreen>();
 }
 

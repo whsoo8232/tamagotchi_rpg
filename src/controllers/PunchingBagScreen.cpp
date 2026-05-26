@@ -120,17 +120,18 @@ void PunchingBagScreen::render(const Character& player) {
     }
 
     std::cout << "\n";
+    // 공통: 1+1+1+2+8+1 = 14줄 사용
     if (state == PBState::DONE) {
         std::cout << Renderer::GREEN << "  샌드백을 완전히 부쉈습니다! 공격력 +5 상승!\n" << Renderer::RESET;
         std::cout << "  아무 키나 눌러 훈련 종료\n";
-        for (int i = 0; i < 8; ++i) std::cout << "\n";
+        Renderer::fillContent(16); // 14+2=16 → 26
         Renderer::drawBottomMenu({"훈련 완료 (클릭)"});
     } else {
         if (punchAnim)
             std::cout << Renderer::YELLOW << "  펀치! (" << punchCount << "/30)\n" << Renderer::RESET;
         else
             std::cout << "  \"펀치\" 버튼을 30번 눌러 샌드백을 부수세요!\n";
-        for (int i = 0; i < 8; ++i) std::cout << "\n";
+        Renderer::fillContent(15); // 14+1=15 → 26
         Renderer::drawBottomMenu({"펀치", "돌아가기"});
     }
 }
@@ -150,8 +151,8 @@ void PunchingBagScreen::handleInput(GameEngine& engine, Character& player, const
 
     int choice = -1;
     if (event.type == InputType::MOUSE_PRESS && event.button == 0) {
-        if (event.y >= 30) {
-            int btnW = 118 / 2;
+        if (event.y >= 31) {
+            int btnW = 158 / 2;
             int btn  = (event.x - 1) / btnW;
             if (btn == 0) choice = 1; // 펀치
             else          choice = 0; // 돌아가기

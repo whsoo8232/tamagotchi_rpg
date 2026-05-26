@@ -5,16 +5,14 @@
 #include "../models/Equipment.h"
 #include <iostream>
 #include <cstdlib>
-#include <ctime>
 
 EquipmentScreen::EquipmentScreen()
     : state(EquipState::MAIN), lastMsg("") {
-    std::srand(static_cast<unsigned>(std::time(nullptr)));
 }
 
 int EquipmentScreen::mouseChoice(const InputEvent& event, int btnCount) {
-    if (event.type == InputType::MOUSE_PRESS && event.button == 0 && event.y >= 30) {
-        int w = 118 / btnCount;
+    if (event.type == InputType::MOUSE_PRESS && event.button == 0 && event.y >= 31) {
+        int w = 158 / btnCount;
         return (event.x - 1) / w; // 0-indexed
     }
     return -1;
@@ -81,11 +79,13 @@ void EquipmentScreen::renderMain(const Character& player) {
         std::cout << (cnt == 0 ? "\033[90m" : "") << line << (cnt == 0 ? Renderer::RESET : "") << "\n";
     }
     std::cout << "\n  소지금: " << player.getMoney() << "원\n";
-
-    for (int i = 0; i < 3; ++i) std::cout << "\n";
-
-    if (!lastMsg.empty()) Renderer::drawMessage(lastMsg);
-    else std::cout << "\n";
+    // 8(rows)+1(─)+2(인벤 헤더)+4(아이템)+2(소지금) = 17줄 사용
+    if (!lastMsg.empty()) {
+        Renderer::drawMessage(lastMsg);  // 2줄
+        Renderer::fillContent(19);        // 17+2=19 → 26
+    } else {
+        Renderer::fillContent(17);        // 17 → 26
+    }
 
     Renderer::drawBottomMenu({"검 강화", "갑옷 강화", "아이템 구매", "돌아가기"});
 }
@@ -119,10 +119,14 @@ void EquipmentScreen::renderItemShop(const Character& player) {
     std::cout << "  └──────┴────────────────┴──────┴──────┴────────────────────────────────────────┘\n";
 
     std::cout << "\n  소지금: " << player.getMoney() << "원\n";
-    for (int i = 0; i < 10; ++i) std::cout << "\n";
+    // 1+6+4+1+2 = 14줄 사용
 
-    if (!lastMsg.empty()) Renderer::drawMessage(lastMsg);
-    else std::cout << "\n";
+    if (!lastMsg.empty()) {
+        Renderer::drawMessage(lastMsg);  // 2줄
+        Renderer::fillContent(16);        // 14+2=16 → 26
+    } else {
+        Renderer::fillContent(14);        // 14 → 26
+    }
 
     Renderer::drawBottomMenu({"힘의 포션", "민첩의 포션", "밧줄", "방패", "돌아가기"});
 }

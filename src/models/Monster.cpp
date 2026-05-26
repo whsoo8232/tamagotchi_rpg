@@ -1,7 +1,7 @@
 #include "Monster.h"
 
-Monster::Monster(std::string name, int hp, int attack) 
-    : name(name), hp(hp), attack(attack), evasion(5), ascii("") {}
+Monster::Monster(std::string name, int hp, int attack)
+    : name(name), hp(hp), maxHp(hp), attack(attack), evasion(5), ascii("") {}
 
 void Monster::takeDamage(int damage) {
     hp -= damage;
