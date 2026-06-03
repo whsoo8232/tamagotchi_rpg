@@ -10,6 +10,7 @@
 class GameEngine {
 public:
     GameEngine();
+    ~GameEngine();
     void run();
     void changeScreen(std::unique_ptr<Screen> nextScreen);
     void quit();

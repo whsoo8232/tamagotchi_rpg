@@ -26,7 +26,7 @@ std::string Renderer::getCurrentDate() {
 // ── 기본 렌더 유틸 ─────────────────────────────────────────────────
 
 void Renderer::clearCanvas() {
-    std::cout << "\033[2J\033[H" << std::flush;
+    std::cout << "\033[2J\033[H"; // flush는 프레임 끝에서 한 번만
 }
 
 void Renderer::fillContent(int usedRows) {

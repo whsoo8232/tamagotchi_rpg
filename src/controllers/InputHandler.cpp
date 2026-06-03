@@ -12,8 +12,7 @@ InputHandler* InputHandler::s_instance = nullptr;
 // async-signal-safe 함수만 사용: write(), tcsetattr(), _exit()
 // std::cout, exit() 등은 시그널 핸들러에서 사용하면 안 됨
 void InputHandler::signalHandler(int /*sig*/) {
-    // 마우스 트래킹 비활성화 (SGR + X10)
-    const char* disableMouse = "\033[?1006l\033[?1000l";
+    const char* disableMouse = "\033[?1006l\033[?1000l\033[?25h"; // 마우스 해제 + 커서 복원
     write(STDOUT_FILENO, disableMouse, strlen(disableMouse));
 
     // raw 모드 → 원래 termios 복원
